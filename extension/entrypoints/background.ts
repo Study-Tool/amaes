@@ -140,7 +140,7 @@ export default defineBackground(() => {
         void browser.notifications
           .create({
             type: 'basic',
-            iconUrl: 'https://study-tool-amaes.pages.dev/assets/amaes-toolkit-logo.png',
+            iconUrl: browser.runtime.getURL('/icon/128.png'),
             title: note.title || 'AMAES Toolkit',
             message: note.text || '',
           })

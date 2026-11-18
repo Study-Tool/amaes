@@ -240,12 +240,8 @@ export function bootToolkit(gmApi) {
     async function verifyClientCompatibility() {
         try {
             const cachedMin = localStorage.getItem('amaes_cached_min_version');
-            if (cachedMin) {
-                const cachedComparison = compareVersions(CLIENT_VERSION, cachedMin);
-                if (cachedComparison !== null && cachedComparison < 0) {
-                    showCompatibilityBlock('version', cachedMin);
-                    return false;
-                }
+            if (cachedMin && /^v?[1-9]\d*\./i.test(cachedMin.trim())) {
+                localStorage.removeItem('amaes_cached_min_version');
             }
         } catch (_) {}
 
@@ -477,8 +473,10 @@ export function bootToolkit(gmApi) {
     let isRunning = false;
     let shouldStop = false;
 
-    // Remote GitHub Asset Loader
-    const TOOLKIT_LOGO_URL = "https://study-tool-amaes.pages.dev/assets/amaes-toolkit-logo.png";
+    // Bundled Extension Asset Loader (fallback to portal CDN)
+    const TOOLKIT_LOGO_URL = (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function')
+        ? browser.runtime.getURL('/icon/128.png')
+        : "https://study-tool-amaes.pages.dev/assets/amaes-toolkit-logo.png";
 
     // ==========================================
     // Unified Network Request Helper (Promise-based GM_xmlhttpRequest / fetch)

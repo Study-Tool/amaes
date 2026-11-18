@@ -28,6 +28,8 @@ describe('migrateLegacyUserscriptStorage', () => {
       amaes_terms_acknowledged: 'true',
       amaes_answer_db_CS6204: '[{"q":"Q1"}]',
       amaes_community_relay_url: 'https://legacy-relay.workers.dev',
+      amaes_cached_min_version: '1.7.5',
+      amaes_cached_latest_version: '1.13.22',
       unrelated_key: 'ignore-me',
     };
     const keys = Object.keys(localData);
@@ -48,6 +50,8 @@ describe('migrateLegacyUserscriptStorage', () => {
     expect(res1.importedKeys).toContain('amaes_gemini_api_key');
     expect(res1.importedKeys).toContain('amaes_answer_db_CS6204');
     expect(localData.amaes_community_relay_url).toBeUndefined();
+    expect(localData.amaes_cached_min_version).toBeUndefined();
+    expect(localData.amaes_cached_latest_version).toBeUndefined();
     expect((await extStorage.get('amaes_gemini_api_key')).amaes_gemini_api_key).toBe('test-key-123');
     expect((await extStorage.get('amaes_answer_db_CS6204')).amaes_answer_db_CS6204).toBe('[{"q":"Q1"}]');
     expect((await extStorage.get('amaes_gemini_model')).amaes_gemini_model).toBe('gemini-2.5-flash');

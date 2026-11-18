@@ -2,36 +2,49 @@
   'use strict';
 
   const RELAY_BASE_URL = 'https://amaes-community-relay.study-tool-amaes-relay.workers.dev';
-  const downloads = {
-    chrome: {
-      href: 'downloads/amaes-toolkit-chrome-mv3.zip',
-      filename: 'amaes-toolkit-chrome-mv3.zip',
-      label: 'Download AMAES Toolkit for Chrome',
-      extPage: 'chrome://extensions',
-      steps: '<strong>Chrome &amp; Brave:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar (<code>Ctrl+L</code> then <code>Ctrl+V</code>), turn <strong>Developer mode</strong> ON (top right), click <strong>Load unpacked</strong>, and select the extracted folder.'
-    },
-    edge: {
-      href: 'downloads/amaes-toolkit-chrome-mv3.zip',
-      filename: 'amaes-toolkit-chrome-mv3.zip',
-      label: 'Download AMAES Toolkit for Edge',
-      extPage: 'edge://extensions',
-      steps: '<strong>Edge:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar (<code>Ctrl+L</code> then <code>Ctrl+V</code>), turn <strong>Developer mode</strong> ON, click <strong>Load unpacked</strong>, and select the extracted folder.'
-    },
-    firefox: {
-      href: 'downloads/amaes-toolkit-firefox-mv2.zip',
-      filename: 'amaes-toolkit-firefox-mv2.zip',
-      label: 'Download AMAES Toolkit for Firefox',
-      extPage: 'about:debugging#/runtime/this-firefox',
-      steps: '<strong>Firefox:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar, click <strong>Load Temporary Add-on...</strong>, and pick <code>manifest.json</code> inside the extracted folder. <em>(Note: temporary add-ons need reloading after Firefox restarts until the signed installer is published.)</em>'
-    },
-    other: {
-      href: 'downloads/amaes-toolkit-chrome-mv3.zip',
-      filename: 'amaes-toolkit-chrome-mv3.zip',
-      label: 'Download AMAES Toolkit (.zip)',
+  let latestVersion = '0.1.0';
+
+  function getDownloadMeta(browser, version) {
+    const cleanVer = String(version || '0.1.0').replace(/^v/i, '');
+    const isFirefox = browser === 'firefox';
+    const target = isFirefox ? 'firefox' : 'chrome';
+    const filename = `amaes-toolkit-${target}-v${cleanVer}.zip`;
+    const href = `downloads/${filename}`;
+    if (browser === 'chrome') {
+      return {
+        href,
+        filename,
+        label: `Download AMAES Toolkit v${cleanVer} for Chrome`,
+        extPage: 'chrome://extensions',
+        steps: '<strong>Chrome &amp; Brave:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar (<code>Ctrl+L</code> then <code>Ctrl+V</code>), turn <strong>Developer mode</strong> ON (top right), click <strong>Load unpacked</strong>, and select the extracted folder.'
+      };
+    }
+    if (browser === 'edge') {
+      return {
+        href,
+        filename,
+        label: `Download AMAES Toolkit v${cleanVer} for Edge`,
+        extPage: 'edge://extensions',
+        steps: '<strong>Edge:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar (<code>Ctrl+L</code> then <code>Ctrl+V</code>), turn <strong>Developer mode</strong> ON, click <strong>Load unpacked</strong>, and select the extracted folder.'
+      };
+    }
+    if (isFirefox) {
+      return {
+        href,
+        filename,
+        label: `Download AMAES Toolkit v${cleanVer} for Firefox`,
+        extPage: 'about:debugging#/runtime/this-firefox',
+        steps: '<strong>Firefox:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar, click <strong>Load Temporary Add-on...</strong>, and pick <code>manifest.json</code> inside the extracted folder (or load the <code>.zip</code> directly).'
+      };
+    }
+    return {
+      href,
+      filename,
+      label: `Download AMAES Toolkit v${cleanVer} (.zip)`,
       extPage: 'chrome://extensions',
       steps: 'Extract the downloaded archive, open your browser extensions page with Developer mode enabled, and choose <strong>Load unpacked</strong>.'
-    }
-  };
+    };
+  }
 
   const names = {
     chrome: 'Chrome / Chromium',
@@ -63,7 +76,6 @@
   const inlineUpdateBtn = document.getElementById('inline-update-btn');
 
   let detectedVersion = null;
-  let latestVersion = null;
   let activeBrowser = 'chrome';
 
   function parseVersion(version) {
@@ -97,10 +109,11 @@
         if (inlineUpdateTitle) {
           inlineUpdateTitle.textContent = `AMAES Toolkit v${latestVersion} is available (you have v${detectedVersion})`;
         }
-        const cfg = downloads[activeBrowser] || downloads.other;
+        const cfg = getDownloadMeta(activeBrowser, latestVersion);
         if (inlineUpdateBtn) {
           inlineUpdateBtn.href = cfg.href;
           inlineUpdateBtn.setAttribute('download', cfg.filename);
+          inlineUpdateBtn.textContent = `Download v${latestVersion}`;
         }
         inlineUpdateBanner.hidden = false;
       }
@@ -150,7 +163,7 @@
     document.querySelectorAll('.browser-choice').forEach(function (button) {
       button.classList.toggle('selected', button.dataset.browser === browser);
     });
-    const cfg = downloads[browser] || downloads.other;
+    const cfg = getDownloadMeta(browser, latestVersion);
     if (browserName) browserName.textContent = names[browser] || names.other;
     if (downloadLink) {
       downloadLink.href = cfg.href;
@@ -263,6 +276,7 @@
         const el = document.getElementById(id);
         if (el && url) el.href = url;
       });
+      chooseBrowser(activeBrowser);
       renderVersionStatus();
     })
     .catch(function () {

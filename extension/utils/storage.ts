@@ -76,7 +76,7 @@ export async function migrateLegacyUserscriptStorage(
   extStorage: StorageLike,
   pageStorage: LocalStorageLike,
 ): Promise<MigrationResult> {
-  // Always clear stale legacy *.workers.dev relay overrides so existing users route to the active relay.
+  // Always clear stale legacy *.workers.dev relay overrides and legacy 1.x version caches.
   const staleRelay = pageStorage.getItem('amaes_community_relay_url');
   if (
     staleRelay &&
@@ -84,6 +84,16 @@ export async function migrateLegacyUserscriptStorage(
     !staleRelay.includes('study-tool-amaes-relay.workers.dev')
   ) {
     pageStorage.removeItem?.('amaes_community_relay_url');
+  }
+  for (const verKey of [
+    'amaes_cached_min_version',
+    'amaes_cached_latest_version',
+    'amaes_latest_version_seen',
+  ]) {
+    const val = pageStorage.getItem(verKey);
+    if (val && /^v?[1-9]\d*\./i.test(val.trim())) {
+      pageStorage.removeItem?.(verKey);
+    }
   }
 
   const marker = await extStorage.get(MIGRATION_DONE_KEY);
