@@ -1,0 +1,551 @@
+    // ==========================================
+    // ==========================================
+    // Welcome & Quick-Start Onboarding Modal
+    // ==========================================
+
+    function showWelcomeOnboardingModal(force = false, focusDev = false) {
+        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true' && isTermsAcknowledged()) {
+            return;
+        }
+
+        const wasAlreadyAcknowledged = isTermsAcknowledged();
+
+        const existing = document.getElementById('amaes-welcome-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'amaes-welcome-modal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
+            z-index: 100002; display: flex; align-items: center; justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 16px; box-sizing: border-box;
+        `;
+
+        const isLight = currentTheme === 'light';
+
+        modal.innerHTML = `
+            <div id="amaes-welcome-card" style="background: ${isLight ? '#ffffff' : '#18181b'}; border: 1px solid ${isLight ? '#e4e4e7' : '#27272a'}; border-radius: 16px; width: 100%; max-width: 480px; box-shadow: ${isLight ? '0 20px 40px -10px rgba(0,0,0,0.12)' : '0 25px 50px -12px rgba(0,0,0,0.7)'}; overflow: hidden; color: ${isLight ? '#18181b' : '#f4f4f5'}; display: flex; flex-direction: column; max-height: 88vh;">
+                <!-- Header -->
+                <div id="amaes-welcome-header" style="padding: 18px 24px 14px; border-bottom: 1px solid ${isLight ? '#f4f4f5' : '#27272a'}; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column;">
+                        <h2 id="amaes-welcome-title" style="margin: 0; font-size: 16px; font-weight: 700; color: ${isLight ? '#18181b' : '#f4f4f5'}; display: flex; align-items: center; gap: 8px;">
+                            ${ICONS.zap} Welcome to AMAES Toolkit
+                        </h2>
+                        <span style="font-size: 11px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 400; margin-top: 2px;">Your All-in-One Study & Quiz Companion</span>
+                    </div>
+                    ${force ? `<button id="btn-welcome-close" style="background:none; border:none; color:${isLight ? '#71717a' : '#a1a1aa'}; font-size:22px; cursor:pointer; line-height:1; padding: 2px 6px;">&times;</button>` : ''}
+                </div>
+                
+                <div id="amaes-welcome-scroll-container" style="padding: 20px 24px; font-size: 12px; line-height: 1.5; display: flex; flex-direction: column; gap: 18px; overflow-y: auto;">
+                    
+                    <!-- Core Highlights Feature List (Clean & Unboxed) -->
+                    <div id="amaes-welcome-highlight-card" style="display: flex; flex-direction: column; gap: 14px;">
+                        <!-- Auto-Answer -->
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <span style="color: ${isLight ? '#059669' : '#10b981'}; margin-top: 2px; flex-shrink: 0;">${ICONS.checkCircle}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Smart Auto-Answer & Highlighter</div>
+                                    <span style="font-size: 9px; color: ${isLight ? '#047857' : '#34d399'}; font-weight: 600; background: ${isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.18)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.3)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">Background Capable</span>
+                                </div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.</div>
+                            </div>
+                        </div>
+
+                        <!-- Community Sharing -->
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <span style="color: ${isLight ? '#2563eb' : '#60a5fa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.upload}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Collect & Share Anonymously</div>
+                                    <span style="font-size: 9px; color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; background: ${isLight ? 'rgba(37, 99, 235, 0.12)' : 'rgba(59, 130, 246, 0.20)'}; border: 1px solid ${isLight ? 'rgba(37, 99, 235, 0.25)' : 'rgba(96, 165, 250, 0.30)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">100% Anonymous</span>
+                                </div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Completed quiz answers are shared anonymously with classmates with zero personal data collected.</div>
+                            </div>
+                        </div>
+
+                        <!-- Built-in Gemini AI -->
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <span style="color: ${isLight ? '#7c3aed' : '#a855f7'}; margin-top: 2px; flex-shrink: 0;">${ICONS.zap}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Built-in Google Gemini AI</div>
+                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: ${isLight ? 'rgba(124, 58, 237, 0.08)' : 'rgba(168, 85, 247, 0.14)'}; color: ${isLight ? '#7c3aed' : '#c084fc'}; border: 1px solid ${isLight ? 'rgba(124, 58, 237, 0.25)' : 'rgba(168, 85, 247, 0.3)'}; font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                                        ${geminiApiKey ? 'Key Configured' : 'Setup AI'}
+                                    </button>
+                                </div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Instant in-quiz AI solver for questions not yet in the community database.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Community Sync Settings (Unboxed & Clean) -->
+                    <details style="padding: 0; margin: 0;">
+                        <summary style="font-size: 11.5px; font-weight: 600; color: ${isLight ? '#3f3f46' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                            <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                            <span>Community Sync Settings</span>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-left: 18px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-harvest" type="checkbox" ${typeof autoHarvestGrades !== 'undefined' && autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
+                                <span>Auto-collect confirmed answers from past quizzes</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
+                                <span>Download verified answers when course opens</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-scrape" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
+                                <span>Auto-check online study guides (AMAUOED)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
+                                <span>Share verified answers with classmates (100% anonymous)</span>
+                            </label>
+                        </div>
+                    </details>
+
+                    <!-- Keyboard Shortcuts Cheatsheet (Unboxed & Clean) -->
+                    <details id="welcome-shortcuts-section" style="padding: 0; margin: 0;">
+                        <summary id="welcome-shortcuts-title" style="font-size: 11.5px; font-weight: 600; color: ${isLight ? '#3f3f46' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" title="Double-click to toggle Developer Console">
+                            <span style="display: flex; align-items: center; gap: 6px;">
+                                <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span>Keyboard Shortcuts Cheatsheet (Comprehensive)</span>
+                                <span id="amaes-secret-cheatsheet-trigger" style="display:none;">Cheatsheet</span>
+                            </span>
+                            <span style="font-size: 10px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 400;">Press <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; color: ${isLight ? '#18181b' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">?</kbd> or <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; color: ${isLight ? '#18181b' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">K</kbd></span>
+                        </summary>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; font-size: 10.5px; color: ${isLight ? '#52525b' : '#a1a1aa'}; margin-top: 8px; padding-left: 18px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">N</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">Space</kbd></span>
+                                <span>Next Question / Page</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">B</kbd></span>
+                                <span>Previous Question / Page</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">U</kbd></span>
+                                <span>Focus First Unanswered</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">[</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">]</kbd></span>
+                                <span>Cycle Prev / Next Quiz or Exam</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">C</kbd></span>
+                                <span>Copy AI Prompt</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">V</kbd></span>
+                                <span>Paste AI Answer</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">P</kbd></span>
+                                <span>Pause / Resume Auto-Quiz</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">1–4</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">A–D</kbd></span>
+                                <span>Select Choice 1 to 4</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">H</kbd></span>
+                                <span>Highlight Answers</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">?</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">K</kbd></span>
+                                <span>Open Quick Guide</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">R</kbd></span>
+                                <span>Retake Quiz (Review Page)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">Esc</kbd></span>
+                                <span>Close Modal / Minimize</span>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Developer & Diagnostic Console Section -->
+                    <div id="amaes-quick-dev-section" style="display: none; background: #15102a; border: 2px solid #a855f7; border-radius: 8px; padding: 12px; flex-direction: column; gap: 8px; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <h3 style="margin: 0; font-size: 12px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
+                                    ${ICONS.debug} <span>Developer & Diagnostics Console</span>
+                                </h3>
+                                <span style="font-size: 9px; font-family: monospace; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 1px 5px; border-radius: 3px;">Active</span>
+                            </div>
+                            <button id="amaes-dev-btn-close" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9px; padding: 2px 7px; color: #94a3b8; border-color: #475569; cursor: pointer;" title="Collapse console">
+                                Collapse
+                            </button>
+                        </div>
+
+                        <!-- Community Mesh Telemetry Card -->
+                        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-size: 9px; font-family: monospace; color: #94a3b8; text-transform: uppercase;">Active Mesh Telemetry</div>
+                                <div style="display: flex; align-items: baseline; gap: 4px; margin-top: 1px;">
+                                    <span id="amaes-dev-mesh-count" style="font-size: 16px; font-weight: 800; font-family: monospace; color: #c084fc;">--</span>
+                                    <span style="font-size: 10px; color: #94a3b8;">peers active</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 6px #a855f7;"></span>
+                                <span style="font-size: 9px; color: #cbd5e1; font-family: monospace;">Mesh Connected</span>
+                            </div>
+                        </div>
+
+                        <!-- Diagnostic Terminal Box -->
+                        <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace; text-transform: uppercase;">
+                                <span>Terminal Command Line</span>
+                                <span>Type 'help' for commands</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <span style="font-family: monospace; font-size: 11px; font-weight: 700; color: #c084fc;">&gt;</span>
+                                <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, cache, logs, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid #475569; border-radius: 4px; padding: 3px 6px; font-family: monospace; font-size: 10px; color: #fff; outline: none;" />
+                                <button id="amaes-dev-cmd-run" type="button" class="amaes-btn" style="padding: 3px 8px; font-size: 10px; font-family: monospace; cursor: pointer; background: #9333ea; color: #fff; border: none; border-radius: 4px; font-weight: 600;">
+                                    Run
+                                </button>
+                            </div>
+                            <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 7px 9px; height: 260px; min-height: 240px; overflow-y: auto; font-family: monospace; font-size: 10px; line-height: 1.45; color: #cbd5e1; display: flex; flex-direction: column; gap: 2px; user-select: text;">
+                                <div style="color: #64748b;">Developer diagnostic terminal ready. Type 'help' for command suite.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Collapsed Secondary Tools & Links (Hidden by default to eliminate clutter) -->
+                    <details id="welcome-more-options" style="padding: 0; margin: 0;">
+                        <summary style="font-size: 11px; font-weight: 600; color: ${isLight ? '#71717a' : '#a1a1aa'}; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                            <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                            <span style="display: flex; align-items: center; gap: 4px;">${ICONS.gear || ICONS.tools} More Options & Maintenance</span>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 18px;">
+                            <!-- Links Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                                <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
+                                <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
+                                <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.globe} <span>Website</span></a>
+                                <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 600;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
+                            </div>
+
+                            <!-- Utilities Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                                <button id="amaes-theme-btn" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Switch between Dark and Light mode">
+                                    ${currentTheme === 'dark' ? ICONS.sun + ' <span>Light Mode</span>' : ICONS.moon + ' <span>Dark Mode</span>'}
+                                </button>
+                                <button id="amaes-bug-btn" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Report a problem or bug to maintainers">
+                                    ${ICONS.bug || ICONS.alertTriangle} <span>Report Bug</span>
+                                </button>
+                                <button id="amaes-debug-btn" type="button" class="amaes-btn amaes-debug-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Copy diagnostic system report to clipboard">
+                                    ${ICONS.clipboard} <span>Copy Log</span>
+                                </button>
+                                <button id="amaes-reset-btn" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Reset installation: clear toolkit data and reopen welcome setup">
+                                    ${ICONS.rotateCcw} <span>Reset All</span>
+                                </button>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Agreement Disclaimer (Unboxed & Clean) -->
+                    <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
+                        <input id="welcome-chk-terms" type="checkbox" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0; accent-color: #10b981;" />
+                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid provided "AS IS". I agree to the <a id="welcome-terms-link" href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/docs/TERMS.md" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;">Terms of Use &amp; Disclaimer</a>, acknowledge that I am solely responsible for my own coursework and academic integrity, and agree to share verified answers anonymously to help classmates.</span>
+                    </label>
+                </div>
+
+                <!-- Footer Action -->
+                <div style="padding: 14px 24px; border-top: 1px solid ${isLight ? '#f4f4f5' : '#27272a'}; background: ${isLight ? '#ffffff' : '#18181b'}; display: flex; justify-content: space-between; align-items: center;">
+                    <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
+                        ${ICONS.book} <span>FAQs & Guide</span>
+                    </a>
+                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
+                        ${ICONS.zap} ${wasAlreadyAcknowledged ? 'Done' : 'Get Started'}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const bindWelcomeToggle = (id, storageKey, onToggle) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.onchange = (e) => {
+                    toolkitStorage.set(storageKey, e.target.checked);
+                    if (onToggle) onToggle(e.target.checked);
+                };
+            }
+        };
+
+        bindWelcomeToggle('welcome-chk-sync', 'amaes_auto_cloud_sync', (v) => { autoCloudSync = v; });
+        bindWelcomeToggle('welcome-chk-share', 'amaes_auto_community_share', (v) => { autoCommunityShare = v; });
+        bindWelcomeToggle('welcome-chk-harvest', 'amaes_auto_harvest_grades', (v) => { if (typeof autoHarvestGrades !== 'undefined') autoHarvestGrades = v; });
+        bindWelcomeToggle('welcome-chk-scrape', 'amaes_auto_scrape_amauoed', (v) => { autoScrapeAmauoed = v; });
+
+        // Developer Section Logic (Lock-Free Direct Console)
+        const devSection = document.getElementById('amaes-quick-dev-section');
+        const devCloseBtn = document.getElementById('amaes-dev-btn-close');
+        const devCmdInput = document.getElementById('amaes-dev-cmd-input');
+        const devCmdRunBtn = document.getElementById('amaes-dev-cmd-run');
+
+        if (devCloseBtn) {
+            devCloseBtn.onclick = () => {
+                if (devSection) devSection.style.display = 'none';
+                if (devMeshInterval) {
+                    clearInterval(devMeshInterval);
+                    devMeshInterval = null;
+                }
+            };
+        }
+
+        if (devCmdRunBtn) devCmdRunBtn.onclick = executeToolkitDevCommand;
+        if (devCmdInput) {
+            devCmdInput.onkeydown = (e) => {
+                if (e.key === 'Enter') executeToolkitDevCommand();
+            };
+        }
+
+        const revealDevSection = (forceOpen = false) => {
+            const sec = document.getElementById('amaes-quick-dev-section');
+            if (sec) {
+                const isHidden = sec.style.display === 'none' || !sec.style.display;
+                if (forceOpen || isHidden) {
+                    sec.style.display = 'flex';
+                    startDevMeshTelemetry();
+                    setTimeout(() => {
+                        try { sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+                        const cmdInp = document.getElementById('amaes-dev-cmd-input');
+                        if (cmdInp && cmdInp.offsetParent !== null) {
+                            cmdInp.focus();
+                        }
+                    }, 50);
+                } else {
+                    sec.style.display = 'none';
+                    if (devMeshInterval) {
+                        clearInterval(devMeshInterval);
+                        devMeshInterval = null;
+                    }
+                }
+            }
+        };
+
+        const attachSecretTrigger = (el) => {
+            if (!el) return;
+            el.ondblclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                revealDevSection();
+            };
+        };
+
+        const secretCheatsheetTrigger = document.getElementById('amaes-secret-cheatsheet-trigger');
+        attachSecretTrigger(secretCheatsheetTrigger);
+        attachSecretTrigger(document.getElementById('welcome-shortcuts-title'));
+
+        if (focusDev) {
+            revealDevSection(true);
+        }
+
+        const termsCheck = document.getElementById('welcome-chk-terms');
+        const gotItButton = document.getElementById('btn-got-it-welcome');
+        const termsContainer = document.getElementById('welcome-terms-container');
+        
+        if (termsCheck && gotItButton && termsContainer) {
+            termsCheck.onchange = () => {
+                const checked = termsCheck.checked;
+                toolkitStorage.set('amaes_terms_acknowledged', checked ? 'true' : 'false');
+                gotItButton.disabled = !checked;
+                gotItButton.style.opacity = checked ? '1' : '0.5';
+                termsContainer.style.borderColor = checked ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.2)';
+                if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
+                if (!checked) {
+                    autoQuizMode = false;
+                    toolkitStorage.set('amaes_auto_quiz_mode', 'false');
+                    showToast("Agreement unaccepted. Pausing tools and refreshing page...", 2500);
+                    setTimeout(() => window.location.reload(), 500);
+                }
+            };
+        }
+
+        const termsLink = document.getElementById('welcome-terms-link');
+        if (termsLink) {
+            termsLink.onclick = (e) => {
+                e.stopPropagation();
+            };
+        }
+
+        const welcomeAiBtn = document.getElementById('welcome-btn-setup-ai');
+        if (welcomeAiBtn) {
+            welcomeAiBtn.onclick = () => {
+                showGeminiSetupModal();
+            };
+        }
+
+        const welcomeReinstallBtn = document.getElementById('welcome-btn-reinstall');
+        if (welcomeReinstallBtn) {
+            welcomeReinstallBtn.onclick = (e) => {
+                e.preventDefault();
+                triggerScriptReinstall();
+            };
+        }
+
+        const themeBtn = document.getElementById('amaes-theme-btn');
+        if (themeBtn) {
+            themeBtn.onclick = () => {
+                const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                applyTheme(nextTheme);
+                showToast(`Theme switched to ${nextTheme} mode`);
+                showWelcomeOnboardingModal(true);
+            };
+        }
+
+        const bugBtn = document.getElementById('amaes-bug-btn');
+        if (bugBtn) {
+            bugBtn.onclick = () => {
+                showBugReportModal();
+            };
+        }
+
+        const debugBtn = document.getElementById('amaes-debug-btn');
+        if (debugBtn) {
+            debugBtn.onclick = async () => {
+                logDebug("Exporting debug diagnostic report...");
+                const report = generateDebugReport();
+                try {
+                    await copyToClipboard(report);
+                    debugBtn.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    showToast("Diagnostic log copied to clipboard!");
+                    setTimeout(() => {
+                        if (debugBtn) {
+                            debugBtn.innerHTML = `${ICONS.clipboard} <span>Copy Log</span>`;
+                        }
+                    }, 2000);
+                } catch (err) {
+                    showToast("Failed to copy log");
+                }
+            };
+        }
+
+        const resetBtn = document.getElementById('amaes-reset-btn');
+        if (resetBtn) {
+            resetBtn.onclick = () => {
+                const ok = confirm(
+                    "Reset AMAES Toolkit to a brand-new installation?\n\n" +
+                    "This clears toolkit settings, cached answer databases, anonymous sharing history, update state, and welcome-page acceptance. " +
+                    "It does not uninstall Violentmonkey or delete Moodle data.\n\n" +
+                    "The welcome setup will reopen after reset. Continue?"
+                );
+                if (ok) {
+                    resetToolkitInstallation();
+                }
+            };
+        }
+
+        const btnCopyInstallGuide = document.getElementById('btn-copy-install-guide');
+        if (btnCopyInstallGuide) {
+            btnCopyInstallGuide.onclick = () => {
+                const guideText = `AMAES Moodle Toolkit - Setup & Installation Guide\n\n` +
+                    `Step 1: Install Violentmonkey (Recommended Userscript Manager):\n` +
+                    `• Chrome / Brave: https://chromewebstore.google.com/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag\n` +
+                    `• Firefox: https://addons.mozilla.org/en-US/firefox/addon/violentmonkey/\n` +
+                    `• Edge: https://microsoftedge.microsoft.com/addons/detail/violentmonkey/eeagobfjfgddacbcigncyclcoaebeent\n\n` +
+                    `Step 2 (CRITICAL for Chrome / Brave / Edge / Opera):\n` +
+                    `• Open chrome://extensions (or edge://extensions) in your browser.\n` +
+                    `• Turn ON "Developer mode" in the top-right corner.\n` +
+                    `(Without Developer mode, modern Chromium browsers block all userscripts from running!)\n\n` +
+                    `Step 3: Install the Script:\n` +
+                    `• Direct Install: ${SCRIPT_RAW_URL}\n` +
+                    `• Greasy Fork: ${GREASYFORK_URL}\n` +
+                    `• GitHub Repo: ${GITHUB_REPO_URL}\n` +
+                    `• Violentmonkey will open a tab — click "Confirm installation".\n\n` +
+                    `Step 4: Go to https://semestral.amaes.com/ (e.g. /2612/ or your semester's term path) and log in!\n` +
+                    `The toolkit panel will automatically appear in the bottom-right corner!`;
+
+                if (typeof GM_setClipboard !== 'undefined') {
+                    GM_setClipboard(guideText);
+                } else if (navigator.clipboard) {
+                    navigator.clipboard.writeText(guideText);
+                }
+                showToast("Setup & install guide copied to clipboard!");
+            };
+        }
+
+        let modalBacktickCount = 0;
+        let modalBacktickTimer = null;
+
+        const handleModalEsc = (e) => {
+            if (e.key === 'Escape' || e.key === 'Esc') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isTermsAcknowledged()) {
+                    showToast("Please acknowledge the terms before proceeding.");
+                    return;
+                }
+                closeModalClean();
+                showToast("Closed Quick Start (Esc)");
+                return;
+            }
+            if (e.key === '`' || e.code === 'Backquote') {
+                const active = document.activeElement;
+                if (active && active.id !== 'amaes-dev-cmd-input' && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+                    return;
+                }
+                modalBacktickCount++;
+                clearTimeout(modalBacktickTimer);
+                modalBacktickTimer = setTimeout(() => { modalBacktickCount = 0; }, 1200);
+                if (modalBacktickCount >= 3) {
+                    modalBacktickCount = 0;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    revealDevSection();
+                }
+            }
+        };
+
+        const closeModalClean = () => {
+            window.removeEventListener('keydown', handleModalEsc);
+            if (devMeshInterval) {
+                clearInterval(devMeshInterval);
+                devMeshInterval = null;
+            }
+            modal.remove();
+        };
+        window.addEventListener('keydown', handleModalEsc);
+
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                if (!isTermsAcknowledged()) {
+                    showToast("Please acknowledge the terms before proceeding.");
+                    return;
+                }
+                closeModalClean();
+            }
+        };
+
+        const dismiss = () => {
+            if (!isTermsAcknowledged()) {
+                showToast("Please acknowledge the terms before proceeding.");
+                return;
+            }
+            closeModalClean();
+            toolkitStorage.set('amaes_welcome_dismissed', 'true');
+            if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
+            if (!wasAlreadyAcknowledged) {
+                showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                showToast("Preferences saved.");
+            }
+        };
+
+        if (gotItButton) gotItButton.onclick = dismiss;
+        
+        const closeBtn = document.getElementById('btn-welcome-close');
+        if (closeBtn) closeBtn.onclick = closeModalClean;
+    }
+
+    // UI Panel Construction

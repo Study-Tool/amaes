@@ -1,0 +1,25 @@
+{
+  "name": "amaes-toolkit-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-browser MV3 extension for AMA Online Education (AMAOEd / AMAES) Moodle portals.",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "wxt prepare",
+    "build:toolkit": "node scripts/build-toolkit-bundle.mjs",
+    "dev": "node scripts/build-toolkit-bundle.mjs && wxt",
+    "dev:firefox": "node scripts/build-toolkit-bundle.mjs && wxt -b firefox",
+    "build": "node scripts/build-toolkit-bundle.mjs && wxt build",
+    "build:firefox": "node scripts/build-toolkit-bundle.mjs && wxt build -b firefox",
+    "zip": "node scripts/build-toolkit-bundle.mjs && wxt zip",
+    "zip:firefox": "node scripts/build-toolkit-bundle.mjs && wxt zip -b firefox",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wxt": "^0.19.28"
+  }
+}

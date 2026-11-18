@@ -1,0 +1,1962 @@
+    // ==========================================
+
+    function createPanel() {
+        if (document.getElementById('amaes-toolkit-panel')) return;
+
+        const courseInfo = detectCourseInfo();
+        const allLocalDbs = getAllSavedSubjectDatabases();
+        const cachedCodes = Object.keys(allLocalDbs);
+        const cardCodes = [];
+        document.querySelectorAll('.coursebox, .dashboard-card, [data-course-id], .course-info-container').forEach(card => {
+            const txt = card.innerText || '';
+            const m = txt.match(/\b([A-Za-z]{2,4}\d{4})\b/);
+            if (m && !cardCodes.includes(m[1].toUpperCase())) {
+                cardCodes.push(m[1].toUpperCase());
+            }
+        });
+        const detectedCodes = Array.from(new Set([...(courseInfo.subjectCode ? [courseInfo.subjectCode] : []), ...cachedCodes, ...cardCodes]));
+        const hasActiveCourse = !!courseInfo.subjectCode;
+        let subCode = courseInfo.subjectCode || detectedCodes[0] || '';
+        const defaultAmauoedUrl = subCode ? getStoredAmauoedUrl(subCode) : '';
+        const isQuiz = checkIsQuizPage();
+        const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
+        const skipPassedQuizzes = (typeof localStorage !== 'undefined' && localStorage.getItem('amaes_skip_passed_quizzes') === 'true');
+        const autoCloseCourseIndex = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_close_course_index') !== 'false' : true);
+        const autoMarkDoneOn100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
+
+        let initialKeyword = "";
+        if (courseInfo.subjectCode) {
+            initialKeyword = courseInfo.currentActivityTitle
+                ? `${courseInfo.subjectCode} ${courseInfo.currentActivityTitle} answer key`
+                : `${courseInfo.subjectCode} answer key`;
+        }
+
+        // Reusable Component Helpers for Clean, Monotone Course Tools Design
+        function renderCardContent(id, icon, title, badge, contentHtml) {
+            return `
+                <div id="${id}-header" class="amaes-card-header">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${icon}
+                        <span class="header-label">${title}</span>
+                        ${badge ? `<span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600;">${badge}</span>` : ''}
+                    </div>
+                    <span id="${id}-arrow" class="arrow-container">${ICONS.chevronRight}</span>
+                </div>
+                <div id="${id}-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    ${contentHtml}
+                </div>
+            `;
+        }
+
+        function renderToolBtn({ id, icon = '', text, title = '', variant = 'monotone', style = '' }) {
+            return `<button id="${id}" class="amaes-btn amaes-btn-${variant}" style="justify-content: center; padding: 5px 3px; font-size: 10px; ${style}" title="${title}">${icon ? icon + ' ' : ''}<span>${text}</span></button>`;
+        }
+
+        const panel = document.createElement('div');
+        panel.id = 'amaes-toolkit-panel';
+
+        panel.innerHTML = `
+            <div class="amaes-sheet-handle" title="Drag down to minimize"></div>
+            <!-- Top App Bar (Overflow-Proof) -->
+            <div id="amaes-header">
+                <div id="amaes-brand">
+                    <div id="amaes-title-group" style="display: flex; align-items: center; gap: 4px;">
+                        <a id="amaes-logo-link" href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" title="Visit Official Website: ${WEBSITE_URL}" style="display: inline-flex; align-items: center; text-decoration: none;">
+                            <img id="amaes-logo-img" src="${TOOLKIT_LOGO_URL}" alt="AMAES Logo">
+                        </a>
+                        <span id="amaes-title">AMAES</span>
+                        <span id="amaes-version-pill" title="${SCRIPT_VERSION}" style="display: inline-flex; align-items: center; max-width: 100%; overflow: visible; white-space: nowrap; font-size: 9px; font-weight: 600; color: var(--text-secondary); background: var(--surface-subtle); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border-subtle); cursor: pointer; user-select: none;">${SCRIPT_VERSION}</span>
+                    </div>
+                </div>
+                
+                <div id="amaes-actions">
+                    <a id="amaes-home-btn" class="amaes-icon-btn" href="${getSemesterCoursesUrl()}" title="Dashboard (My Courses)">
+                        ${ICONS.home}
+                    </a>
+
+                    <button id="amaes-bug-header-btn" class="amaes-icon-btn" title="Report a Problem or Question Anomaly" style="color: var(--text-muted, #94a3b8);">
+                        ${ICONS.bug}
+                    </button>
+
+                    <button id="amaes-help-btn" class="amaes-icon-btn" title="Quick Start Guide, Utilities & Documentation">
+                        ${ICONS.help}
+                    </button>
+
+                    <button id="amaes-min-btn" class="amaes-icon-btn" title="Minimize / Expand">
+                        ${ICONS.minimize}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lock Overlay (Displayed when terms are not acknowledged) -->
+            <div id="amaes-panel-lock-overlay" style="display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 10px; padding: 16px 14px; margin-top: 6px; box-sizing: border-box;">
+                <div id="amaes-lock-big-icon" style="width: 44px; height: 44px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); display: flex; align-items: center; justify-content: center; color: #f87171; cursor: pointer; transition: transform 0.15s ease;" title="Click to view terms and conditions">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                </div>
+                <div>
+                    <div style="font-weight: 800; font-size: 13px; color: #f87171; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                        ${ICONS.lock} <span>Toolkit Locked</span>
+                    </div>
+                    <div style="font-size: 10.5px; color: var(--text-secondary, #cbd5e1); margin-top: 4px; line-height: 1.4;">
+                        Please agree to the study disclaimer below to unlock the toolkit and quiz tools.
+                    </div>
+                </div>
+
+                <label id="amaes-lock-terms-label" style="display: flex; align-items: flex-start; gap: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px; cursor: pointer; text-align: left; width: 100%; box-sizing: border-box; transition: border-color 0.2s;">
+                    <input id="amaes-lock-chk-terms" type="checkbox" style="width: 16px; height: 16px; margin-top: 2px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
+                    <span style="font-size: 10.5px; color: #cbd5e1; line-height: 1.35;">
+                        I understand and accept the <span style="color: #f4f4f5; font-weight: 600;">Terms of Use &amp; Disclaimer</span>, and will use this toolkit responsibly.
+                    </span>
+                </label>
+
+                <div style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                    <button id="amaes-btn-lock-view-terms" class="amaes-btn amaes-btn-outline" style="padding: 6px 10px; font-size: 10px; width: 100%; justify-content: center; cursor: pointer;">
+                        ${ICONS.help} <span>Read Terms & Quick Start Guide</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Panel Body -->
+            <div id="amaes-panel-body">
+
+                <!-- Dynamic Update Notification Container -->
+                <div id="amaes-update-container"></div>
+
+                <!-- Categorized Persona Navigation Tabs -->
+                <div id="amaes-nav-tabs">
+                    <button class="amaes-tab-btn active" data-tab="quiz" title="Automatic Quiz Solver, AI Prompts & In-Quiz Assistance">
+                        ${ICONS.target} <span>Quiz</span>
+                    </button>
+                    <button class="amaes-tab-btn" data-tab="db" title="Saved Question Library, Verified Answers & Online Study Guides">
+                        ${ICONS.database} <span>Library</span>
+                    </button>
+                    <button class="amaes-tab-btn" data-tab="course" title="Course Tools, Lecture Auto-Marker & Study Helpers">
+                        ${ICONS.tools} <span>Course</span>
+                    </button>
+                    <button class="amaes-tab-btn" data-tab="accounts" title="Switch accounts or manage saved logins">
+                        ${ICONS.user} <span>Accounts</span>
+                    </button>
+                </div>
+
+                <!-- TAB PANE 1: Quiz -->
+                <div id="tab-pane-quiz" class="amaes-tab-pane" style="padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                    <!-- Master Run / Pause Button with Clear Subtitle -->
+                    <div style="display: flex; flex-direction: column; gap: 3px;">
+                        <button id="btn-master-auto-quiz" class="amaes-btn" style="justify-content: center; padding: 8px 12px; font-weight: 800; font-size: 11.5px; border: none; border-radius: 6px; background: ${autoQuizMode ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: #fff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25);" title="Toggle hands-free Autonomous Quiz Solver (Shortcut: P)">
+                            ${autoQuizMode ? ICONS.stop + ' <span>Pause Auto-Quiz</span>' : ICONS.play + ' <span>Start Auto-Quiz</span>'}
+                        </button>
+                        <div id="amaes-autoquiz-subtext" style="display: none;">
+                            ${autoQuizMode ? 'Auto-answering & advancing in background. Click to pause.' : 'Auto-answers & advances. Pauses & copies on unknown questions.'}
+                        </div>
+                    </div>
+
+
+
+                    <!-- Batch actions on multi-question pages -->
+                    <div id="amaes-batch-copy-container" style="display: ${isQuiz && Boolean(document.querySelector('.que')) && !autoQuizMode ? 'flex' : 'none'}; gap: 4px; margin-top: 2px;">
+                        <button id="btn-fill-all-page" class="amaes-btn" style="flex: 1; justify-content: center; padding: 5px 6px; cursor: pointer; font-size: 10px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; border: none; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" title="1-Click: Automatically selects all verified answers for questions on this page">
+                            ${ICONS.zap} <span>Fill Verified Answers</span>
+                        </button>
+                        <button id="btn-copy-all-q" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 5px 4px; cursor: pointer; font-size: 10px;" title="Copy all questions on current page formatted for AI batch prompt">
+                            ${ICONS.copy} <span>Copy All</span>
+                        </button>
+                    </div>
+
+                    <!-- Seamless Quiz Highlighter -->
+                    ${!isQuiz ? `
+                    <div style="display: flex; gap: 4px; margin-top: 2px;">
+                        <button id="btn-hl-missing-quizzes" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 6px 8px; font-size: 10.5px; font-weight: 600; border-radius: 6px; gap: 5px;" title="${isExamPortal ? 'Highlight unanswered, unattempted, or missing exams on Course or Grades page' : 'Highlight unanswered, unattempted, or missing quizzes on Course or Grades page'}">
+                            ${ICONS.target} <span>${isExamPortal ? 'Highlight Missing Exams' : 'Highlight Missing Quizzes'}</span>
+                        </button>
+                    </div>
+                    ` : `
+                    <div style="display: flex; gap: 4px; margin-top: 2px;">
+                        <button id="btn-trigger-hl-answers" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 6px 8px; font-size: 10px; font-weight: 600; border-radius: 6px; gap: 5px;" title="Highlight answers from database and study guides (Shortcut: H)">
+                            ${ICONS.preview} <span>Highlight Answers (H)</span>
+                        </button>
+                    </div>
+                    `}
+
+                    <!-- Primary Core Settings -->
+                    <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+                        <!-- Assistive Visual Highlighting -->
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Highlight verified database and study guide answers with color codes">
+                            <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Highlight Answers</span>
+                        </label>
+
+                        <!-- Autonomous Pilot Automation Options -->
+                        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
+                            <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Auto-Pilot Automation</div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Automatically select choice inputs when verified answers are matched">
+                                <input id="chk-auto-pick" type="checkbox" ${autoQuizMode || autoPickQuiz ? 'checked' : ''} ${autoQuizMode ? 'disabled' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Pick Answers</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
+                                <input id="chk-auto-next-verified" type="checkbox" ${autoQuizMode || autoNextVerified ? 'checked' : ''} ${autoQuizMode ? 'disabled' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Advance to Next Question</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select Jenny's Online or AMAUOED study guide choices when no verified answer is available in the database.">
+                                <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoQuizMode || autoPickStudyGuideFallback ? 'checked' : ''} ${autoQuizMode ? 'disabled' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Online Study Guides (Jenny &amp; AMA)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
+                                <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Submit Quiz</span>
+                            </label>
+                        </div>
+
+
+                    </div>
+
+                    <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
+                    <details id="amaes-advanced-quiz-settings" style="margin-top: 2px; border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
+                        <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; user-select: none;">
+                            <span style="display: flex; align-items: center; gap: 5px;">
+                                ${ICONS.gear || ICONS.tools}
+                                <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span>Advanced Settings</span>
+                            </span>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border-subtle); background: rgba(0,0,0,0.18);">
+                            <!-- Nested Built-in AI Settings (Collapsed by default) -->
+                            <details id="amaes-ai-quiz-settings-block" style="border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
+                                <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                                    <span style="display: flex; align-items: center; gap: 5px;">
+                                        ${ICONS.gemini}
+                                        <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                        <span style="text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">Built-in AI</span>
+                                    </span>
+                                    <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: ${geminiApiKey ? 'var(--accent-green, #10b981)' : 'var(--text-muted)'}; background: ${geminiApiKey ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)'}; border: 1px solid ${geminiApiKey ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 3px; padding: 1px 5px;">${geminiApiKey ? 'Active' : 'Not Set'}</span>
+                                </summary>
+                                <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border-subtle); background: rgba(0, 0, 0, 0.15);">
+                                    <button id="btn-quiz-config-ai" type="button" class="amaes-btn" style="justify-content: center; padding: 5px 8px; font-size: 10px; background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; font-weight: 600; cursor: pointer;">
+                                        ${ICONS.gear} <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Key'}</span>
+                                    </button>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="When question is not in DB, automatically ask AI for the answer">
+                                        <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                        <span>Ask AI on Unknown</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically checks AI choice (if off, highlights in purple for manual review)">
+                                        <input id="chk-ai-auto-select" type="checkbox" ${aiAutoSelect ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                        <span>Auto-Select AI</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Copies question to clipboard if AI fails or times out">
+                                        <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                        <span>Auto-Copy on Fail</span>
+                                    </label>
+                                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                        <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;">Retries on Failure:</span>
+                                        <select id="sel-ai-retry-count" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                            <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
+                                            <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
+                                            <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
+                                            <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
+                                            <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                                        </select>
+                                    </div>
+                                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                        <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;">Request Speed:</span>
+                                        <select id="sel-ai-plan-tier" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                            <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Standard (Free tier)</option>
+                                            <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Fast (Paid API key)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- Section: Navigation & Interface -->
+                            <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">Navigation & Interface</div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Keyboard shortcuts: Space / N for Next page, [ / ] to cycle quizzes/exams, P to Pause auto-submit or auto-quiz, C for Copy AI, V for Paste AI, 1-4 / A-D to pick choices, H to Highlight">
+                                <input id="chk-keyboard-shortcuts" type="checkbox" ${enableKeyboardShortcuts ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Keyboard Shortcuts</span>
+                            </label>
+                            ${!isExamPortal ? `
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="When cycling with [ and ], automatically skip quizzes with passing scores (≥80%) and jump to the next unpassed or unattempted quiz">
+                                <input id="chk-skip-passed-quizzes" type="checkbox" ${skipPassedQuizzes ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Skip Passed Quizzes (≥80%)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically close the left Course Index drawer when landing on a course page so course content expands to full width">
+                                <input id="chk-auto-close-course-index" type="checkbox" ${autoCloseCourseIndex ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Close Course Index Drawer</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically mark the Moodle activity as Done when a quiz achieves a 100% perfect score">
+                                <input id="chk-auto-mark-done-100" type="checkbox" ${autoMarkDoneOn100 ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Mark Activity Done on 100% Score</span>
+                            </label>
+                            ` : ''}
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Audio feedback: Plays a chime ding when the quiz is finished and an alert chime when manual intervention is needed">
+                                <input id="chk-audio-alerts" type="checkbox" ${enableAudioAlerts ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Audio Notifications</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-minimize toolkit panel to floating smart pill during quiz attempts">
+                                <input id="chk-auto-min-quiz" type="checkbox" ${autoMinimizeQuiz ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Minimize During Quiz</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Adaptive Probe: When an unreviewed quiz attempt scores < 100%, automatically rotate choices on unverified questions on next attempts until 100% is reached">
+                                <input id="chk-adaptive-probe" type="checkbox" ${adaptiveProbeQuiz ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Adaptive Probe (Unreviewed Quizzes)</span>
+                            </label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;" title="Review leeway delay before auto-submitting on the quiz summary check page">Auto-Submit Leeway:</span>
+                                <select id="sel-auto-submit-delay" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                    <option value="0" ${autoSubmitDelay === 0 ? 'selected' : ''}>0s (Instant)</option>
+                                    <option value="5" ${autoSubmitDelay === 5 ? 'selected' : ''}>5 seconds</option>
+                                    <option value="10" ${autoSubmitDelay === 10 ? 'selected' : ''}>10 seconds (Default)</option>
+                                    <option value="15" ${autoSubmitDelay === 15 ? 'selected' : ''}>15 seconds</option>
+                                    <option value="20" ${autoSubmitDelay === 20 ? 'selected' : ''}>20 seconds</option>
+                                    <option value="30" ${autoSubmitDelay === 30 ? 'selected' : ''}>30 seconds</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;" title="Number of unverified questions to rotate per attempt">Probe Budget / Attempt:</span>
+                                <select id="sel-adaptive-probe-budget" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                    <option value="1" ${adaptiveProbeBudget === 1 ? 'selected' : ''}>1 question (Safe)</option>
+                                    <option value="2" ${adaptiveProbeBudget === 2 ? 'selected' : ''}>2 questions (Recommended)</option>
+                                    <option value="3" ${adaptiveProbeBudget === 3 ? 'selected' : ''}>3 questions (Fast)</option>
+                                    <option value="5" ${adaptiveProbeBudget === 5 ? 'selected' : ''}>5 questions (Aggressive)</option>
+                                </select>
+                            </div>
+
+                            <!-- Section: AI Prompt Formatting -->
+                            <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">AI Prompt Formatting</div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Inject convenient 'Copy Question' and 'Copy Image' buttons directly above question cards">
+                                <input id="chk-show-in-q-btns" type="checkbox" ${showInQuestionAiBtns ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Show In-Question Copy Buttons</span>
+                            </label>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- TAB PANE 2: Verified Answer Database -->
+                <div id="tab-pane-db" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    <!-- Course-Wide Coverage Breakdown Card -->
+                    <div id="amaes-term-coverage-card" style="background: rgba(0,0,0,0.2); padding: 7px 9px; border-radius: 6px; border: 1px solid var(--border-subtle); display: ${hasActiveCourse ? 'flex' : 'none'}; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; padding-bottom: 3px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
+                                <span style="display: inline-flex; color: var(--accent-blue);">${ICONS.database}</span>
+                                <span style="font-size: 10px; font-weight: 700; color: var(--text-primary); white-space: nowrap;">Subject Questions</span>
+                                <span id="amaes-coverage-badge" style="font-size: 9px; font-weight: 700; color: #60a5fa; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); padding: 1px 5px; border-radius: 4px; white-space: nowrap;">${subCode || ''}</span>
+                                <span id="amaes-coverage-title" style="display: none;">Course Coverage (${subCode || 'General'}):</span>
+                            </div>
+                            <span id="amaes-term-summary" style="font-size: 9px; font-weight: 600; color: var(--accent-green); white-space: nowrap; text-align: right;">Loading...</span>
+                        </div>
+                        
+                        <!-- Unified Source Breakdown: Verified Library, Study Guides, Eliminated Wrong -->
+                        <div id="amaes-source-breakdown" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; font-size: 9.5px;">
+                            <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Verified answers confirmed by quiz grading keys (includes your completed quizzes & community contributions)">
+                                <div style="font-size: 8.5px; font-weight: 700; color: #34d399;">Verified Library</div>
+                                <div id="amaes-stat-verified" style="font-size: 11px; font-weight: 800; color: #6ee7b7;">0</div>
+                            </div>
+                            <div style="background: rgba(168, 85, 247, 0.14); border: 1px solid rgba(192, 132, 252, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Online study guide answers found for this subject">
+                                <div style="font-size: 8.5px; font-weight: 700; color: #d8b4fe;">Study Guides</div>
+                                <div id="amaes-stat-amauoed" style="font-size: 11px; font-weight: 800; color: #f3e8ff;">0</div>
+                            </div>
+                            <div style="background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Choices confirmed incorrect during reviews">
+                                <div style="font-size: 8.5px; font-weight: 700; color: #fca5a5;">Eliminated Wrong</div>
+                                <div id="amaes-stat-eliminated" style="font-size: 11px; font-weight: 800; color: #fee2e2;">0</div>
+                            </div>
+                        </div>
+
+                        <!-- Term Pills -->
+                        <div id="amaes-term-pills" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 2px;">
+                            <!-- Populated dynamically by updateTermCoverageUI -->
+                        </div>
+                    </div>
+
+
+                    <!-- Online Study Guides (AMAUOED & Jenny's Online) -->
+                    <details style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 5px 7px; background: rgba(0,0,0,0.15);">
+                        <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none;">
+                            <span style="display: flex; align-items: center; gap: 5px;">
+                                ${ICONS.book}
+                                <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span>Online Study Guides (AMAUOED & Jenny's Online)</span>
+                            </span>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically check online study guides if questions are not yet in your library (Default: ON)">
+                                <input id="chk-auto-scrape-amauoed" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer;" />
+                                <span style="font-weight: 500; color: var(--text-secondary);">Auto-check study guides when missing</span>
+                            </label>
+
+                            <!-- AMAUOED Guide Row -->
+                            <div style="font-size: 9px; font-weight: 600; color: var(--text-muted); margin-top: 1px;">AMAUOED Course Guide:</div>
+                            <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
+                                <a id="amauoed-link-display" href="${defaultAmauoedUrl || '#'}" target="_blank" rel="noopener noreferrer" style="
+                                    flex: 1;
+                                    min-width: 0;
+                                    font-size: 10px;
+                                    color: var(--accent-blue);
+                                    text-decoration: underline;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                " title="${defaultAmauoedUrl || 'No link detected yet'}">${defaultAmauoedUrl || 'No study guide link detected'}</a>
+                                <button id="btn-copy-amauoed-link" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; padding: 3px 6px; font-size: 9.5px; font-weight: 600; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;" title="Copy study guide URL to clipboard" ${defaultAmauoedUrl ? '' : 'disabled'}>
+                                    ${ICONS.copy} <span>Copy Link</span>
+                                </button>
+                            </div>
+                            <div id="amauoed-url-match-badge" style="display: none; font-size: 9px; padding: 2px 5px; border-radius: 4px; line-height: 1.3; box-sizing: border-box;"></div>
+
+                            <!-- Jenny's Online Guide Row -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; font-weight: 600; color: var(--text-muted); margin-top: 3px;">
+                                <span>Jenny's Online Blog Guide:</span>
+                                <span id="jennysonline-status-pill" style="font-size: 8.5px; font-weight: 600; color: var(--accent-purple, #c084fc);"></span>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
+                                <a id="jennysonline-link-display" href="#" target="_blank" rel="noopener noreferrer" style="
+                                    flex: 1;
+                                    min-width: 0;
+                                    font-size: 10px;
+                                    color: var(--accent-purple, #c084fc);
+                                    text-decoration: underline;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                " title="Jenny's Online study guide link">Checking Jenny's Online...</a>
+                                <button id="btn-copy-jennysonline-link" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; padding: 3px 6px; font-size: 9.5px; font-weight: 600; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;" title="Copy Jenny's Online link to clipboard" disabled>
+                                    ${ICONS.copy} <span>Copy Link</span>
+                                </button>
+                            </div>
+                            <div id="jennysonline-match-badge" style="display: none; font-size: 9.5px; padding: 3px 5px; border-radius: 4px; line-height: 1.35; box-sizing: border-box;"></div>
+                        </div>
+                    </details>
+
+                    <!-- Auto Settings for Sync & Sharing -->
+                    <div style="display: flex; flex-direction: column; gap: 6px; background: var(--surface-subtle); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-collect confirmed answers from past quizzes">
+                            <input id="chk-auto-harvest-grades" type="checkbox" ${autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span style="font-weight: 500; color: var(--text-secondary);">Auto-Collect Quizzes</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically download verified community answers when opening a course page">
+                            <input id="chk-auto-cloud-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span style="font-weight: 500; color: var(--text-secondary);">Auto-Sync Community</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Share verified review answers anonymously">
+                            <input id="chk-auto-community-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span style="font-weight: 500; color: var(--text-secondary);">Auto-Share Reviews</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- TAB PANE 3: Course Automation Tools -->
+                <div id="tab-pane-course" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    ${isExamPortal ? `
+                        <div id="amaes-exam-portal-banner" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 6px; font-size: 11px; color: var(--accent-blue, #2563eb);">
+                            <span style="display: inline-flex; align-items: center; color: var(--accent-blue);">${ICONS.target}</span>
+                            <span><b>Exam Portal Mode:</b> Only exam assessments are hosted here. Non-exam tools (lectures/videos) are disabled.</span>
+                        </div>
+                    ` : ''}
+                    <div id="mod-marker-card" class="amaes-card">
+                        ${renderCardContent('mod-marker', ICONS.check, 'Activity Auto-Marker', '', `
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: isExamPortal ? 'Auto-Mark Passed Exams (≥80%)' : 'Auto-Mark All Eligible as Done', title: isExamPortal ? 'Mark passed exams (≥80%) as done' : 'Mark all lectures and passed quizzes (≥80%) as done', style: 'width: 100%; padding: 6px; font-weight: 700; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2)); border: 1px solid rgba(16,185,129,0.4); color: var(--accent-green, #10b981);' })}
+                                <div style="display: flex; gap: 4px;">
+                                    ${!isExamPortal ? renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark lectures as done', style: 'flex: 1;' }) : ''}
+                                    ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: isExamPortal ? 'Exams (≥80%)' : 'Quizzes (≥80%)', title: isExamPortal ? 'Mark exams with passable grade as done' : 'Mark quizzes with passable grade as done', style: 'flex: 1;' })}
+                                    ${!isExamPortal ? renderToolBtn({ id: 'btn-undo-all', icon: ICONS.undo, text: 'Undo', title: 'Undo all completions', style: 'width: auto; padding: 5px 8px;' }) : ''}
+                                </div>
+                            </div>
+                        `)}
+                    </div>
+
+                    <div id="mod-highlighter-card" class="amaes-card">
+                        ${renderCardContent('mod-highlighter', ICONS.preview, 'Activity Highlighter', '', `
+                            <div style="display: flex; gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-hl-missing-quizzes-course', icon: ICONS.target, text: isExamPortal ? 'Highlight Incomplete Exams (<80%)' : 'Highlight Incomplete Quizzes (<80%)', title: isExamPortal ? 'Highlight unanswered, unattempted, or missing exams (<80%)' : 'Highlight unanswered, unattempted, or missing quizzes (<80%)', style: 'width: 100%; font-weight: 700; padding: 6px; background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);' })}
+                            </div>
+                            <div style="display: flex; gap: 4px; margin-top: 4px;">
+                                ${!isExamPortal ? renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lectures', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' }) : ''}
+                                ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', title: 'Clear all highlights', style: 'flex: 1;' })}
+                            </div>
+                        `)}
+                    </div>
+
+                    <div id="mod-search-card" class="amaes-card">
+                        ${renderCardContent('mod-search', ICONS.search, 'Search Helper', '', `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
+                                <span style="color: var(--text-muted);">Subject Code:</span>
+                                <span id="detected-code-badge" style="font-weight: 600; color: var(--text-primary); background: var(--surface); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);">
+                                    ${courseInfo.subjectCode || "None"}
+                                </span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                <input id="search-keyword-input" type="text" value="${initialKeyword}" placeholder="Search query" style="
+                                    width: 100%;
+                                    background: var(--bg);
+                                    color: var(--text-primary);
+                                    border: 1px solid var(--border);
+                                    padding: 5px 8px;
+                                    border-radius: 5px;
+                                    font-size: 11px;
+                                    box-sizing: border-box;
+                                    outline: none;
+                                " />
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                ${renderToolBtn({ id: 'btn-copy-keyword', icon: ICONS.copy, text: 'Copy', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-open-google', icon: ICONS.external, text: 'Google', style: 'flex: 1;' })}
+                            </div>
+                        `)}
+                    </div>
+
+                    <div id="mod-ai-card" class="amaes-card">
+                        ${renderCardContent('mod-ai', '<span style="font-weight: 700; color: var(--accent-purple); font-size: 11px;">AI</span>', 'Smart AI Assistant', '', `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
+                                <span style="color: var(--text-muted);">Status:</span>
+                                <span id="gemini-status-badge" style="font-weight: 600; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
+                                    ${geminiApiKey ? 'Ready (Gemini Flash)' : 'Not configured'}
+                                </span>
+                            </div>
+
+                            <p style="font-size: 10px; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+                                Answers unknown questions automatically using Google AI Studio. 0 tokens used on questions already in DB.
+                            </p>
+
+                            <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--border-subtle); padding-top: 5px;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
+                                    <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
+                                    <span>Auto-Copy Question on AI Failure (Default: ON)</span>
+                                </label>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
+                                    <select id="sel-course-ai-retry-count" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                        <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
+                                        <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
+                                        <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
+                                        <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
+                                        <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">API Mode:</span>
+                                    <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                        <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                        <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 6px; margin-top: 2px;">
+                                <button id="btn-open-gemini-setup" type="button" class="amaes-btn amaes-btn-monotone" style="flex: 1; justify-content: center; background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.28); font-weight: 600; cursor: pointer;">
+                                    <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
+                                </button>
+                            </div>
+                        `)}
+                    </div>
+                </div>
+
+                <!-- TAB PANE 4: Account Switcher -->
+                <div id="tab-pane-accounts" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    <div id="mod-accounts-switcher-card" class="amaes-card">
+                        ${renderCardContent('mod-accounts-switcher', ICONS.user, 'Account Switcher', '', `
+                            <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
+                                <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                                <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                                <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name (optional)" aria-label="Nickname / Display name (optional)" style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                                <button id="amaes-account-switcher-submit" type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
+                                <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
+                            </form>
+                            <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer; margin-top: 2px;">
+                                <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
+                                <span>Return to current page after switch</span>
+                            </label>
+                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your userscript manager on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
+                            <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                        `)}
+                    </div>
+
+                    <div id="mod-accounts-transfer-card" class="amaes-card">
+                        ${renderCardContent('mod-accounts-transfer', ICONS.share || ICONS.cloud, 'Setup Transfer (Sync Devices)', '', `
+                            <div id="amaes-account-transfer" style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.4;">
+                                    Easily sync your saved Moodle accounts, Gemini AI keys, and settings to your other phone, laptop, or computer in two simple steps.
+                                </div>
+
+                                <!-- Step 1: Send from this device -->
+                                <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 1: Send Setup (This Device)</div>
+                                    <div style="display: flex; flex-direction: column; gap: 3px;">
+                                        <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                            <input id="amaes-transfer-include-accounts" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                            <span>Saved Moodle Accounts & Logins</span>
+                                        </label>
+                                        <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                            <input id="amaes-transfer-include-api-keys" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                            <span>Personal Gemini API Keys</span>
+                                        </label>
+                                        <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                            <input id="amaes-transfer-include-settings" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                            <span>Toolkit Preferences & Themes</span>
+                                        </label>
+                                        <input id="amaes-transfer-secret-consent" type="checkbox" checked style="display: none;" />
+                                    </div>
+                                    <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-monotone" style="justify-content: center; font-size: 9.5px; font-weight: 700; padding: 6px;">
+                                        Generate One-Time Transfer Code
+                                    </button>
+                                    <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--accent-blue, #3b82f6); padding: 6px 8px; border-radius: 4px; font-size: 10px; font-family: monospace; text-align: center;" />
+                                    <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">
+                                        ${ICONS.copy} <span>Copy Code Again</span>
+                                    </button>
+                                </div>
+
+                                <!-- Step 2: Receive on this device -->
+                                <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 2: Receive Setup (New Device)</div>
+                                    <div style="font-size: 9px; color: var(--text-secondary);">
+                                        Paste the 43-character code generated from your other device:
+                                    </div>
+                                    <div style="display: flex; gap: 4px; align-items: center;">
+                                        <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Paste transfer code here..." aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
+                                        <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Import Setup</button>
+                                    </div>
+                                    <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4; padding: 5px 7px; background: rgba(59, 130, 246, 0.08); border-radius: 4px;"></div>
+                                    <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; font-weight: 700; padding: 5px;">Confirm & Apply Setup</button>
+                                    <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Cancel</button>
+                                </div>
+                                <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. End-to-end encrypted; credentials are saved directly to this browser.</div>
+                                <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary); min-height: 12px;"></div>
+                            </div>
+                        `)}
+                    </div>
+                </div>
+
+                <!-- Stop Button -->
+                <button id="amaes-stop-btn" class="amaes-btn amaes-btn-stop" style="display: none; margin-bottom: 6px;">
+                    ${ICONS.stop} <span>Stop Execution</span>
+                </button>
+            </div>
+        `;
+
+        let backdrop = document.getElementById('amaes-panel-backdrop');
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.id = 'amaes-panel-backdrop';
+            document.body.appendChild(backdrop);
+        }
+
+        document.body.appendChild(panel);
+        setupAccountSwitcherUI();
+        setupAccountTransferUI();
+
+        // Inject Dynamic CSS Stylesheet
+        const styleSheet = document.createElement('style');
+        styleSheet.id = 'amaes-toolkit-styles';
+        document.head.appendChild(styleSheet);
+
+        function updatePanelThemeStyles(themeKey) {
+            const t = THEMES[themeKey] || THEMES.dark;
+
+            styleSheet.textContent = `
+                :root {
+                    --bg: ${t.bg};
+                    --surface: ${t.surface};
+                    --surface-subtle: ${t.surfaceSubtle};
+                    --border: ${t.border};
+                    --border-subtle: ${t.borderSubtle};
+                    --text-primary: ${t.textPrimary};
+                    --text-secondary: ${t.textSecondary};
+                    --text-muted: ${t.textMuted};
+                    --accent-blue: ${t.accentBlue};
+                    --accent-blue-hover: ${t.accentBlueHover};
+                    --accent-pink: ${t.accentPink};
+                    --accent-pink-hover: ${t.accentPinkHover};
+                    --accent-purple: ${t.accentPurple};
+                    --accent-purple-hover: ${t.accentPurpleHover};
+                    --accent-green: ${t.accentGreen};
+                    --accent-green-hover: ${t.accentGreenHover};
+                    --accent-amber: ${t.accentAmber};
+                    --accent-gray: ${t.accentGray};
+                    --shadow: ${t.shadow};
+                    --status-bg: ${t.statusBg};
+                }
+
+                #amaes-toolkit-panel {
+                    position: fixed;
+                    top: auto;
+                    bottom: 26px;
+                    right: 24px;
+                    z-index: 999999;
+                    background: var(--bg);
+                    color: var(--text-primary);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+                    font-size: 12px;
+                    padding: 12px;
+                    border-radius: 12px;
+                    box-shadow: var(--shadow);
+                    border: 1px solid var(--border);
+                    width: 350px;
+                    max-height: calc(100vh - 40px);
+                    box-sizing: border-box;
+                    user-select: none;
+                    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                #amaes-toolkit-panel input[type="checkbox"],
+                .amaes-modal-container input[type="checkbox"],
+                #amaes-welcome-modal input[type="checkbox"] {
+                    accent-color: var(--accent-green, #10b981) !important;
+                }
+
+                details summary {
+                    list-style: none;
+                }
+                details summary::-webkit-details-marker {
+                    display: none;
+                }
+
+                .amaes-summary-chevron {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: transform 0.2s ease;
+                }
+                details[open] > summary .amaes-summary-chevron {
+                    transform: rotate(90deg);
+                }
+
+                #amaes-toolkit-panel.amaes-minimized {
+                    width: auto !important;
+                    min-width: 0 !important;
+                    height: 32px !important;
+                    min-height: 32px !important;
+                    padding: 0 12px !important;
+                    border-radius: 20px !important;
+                    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35) !important;
+                    cursor: pointer;
+                    background: var(--bg);
+                    border: 1px solid var(--border);
+                    display: inline-flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    box-sizing: border-box !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-header {
+                    display: inline-flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 8px !important;
+                    width: auto !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    border-bottom: none !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-brand,
+                #amaes-toolkit-panel.amaes-minimized #amaes-title-group,
+                #amaes-toolkit-panel.amaes-minimized #amaes-actions {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-title-group {
+                    gap: 6px !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-version-pill,
+                #amaes-toolkit-panel.amaes-minimized #amaes-bug-header-btn,
+                #amaes-toolkit-panel.amaes-minimized #amaes-help-btn,
+                #amaes-toolkit-panel.amaes-minimized #amaes-home-btn {
+                    display: none !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized .amaes-icon-btn {
+                    width: 22px !important;
+                    height: 22px !important;
+                    border-radius: 50% !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-title {
+                    font-size: 11px;
+                    font-weight: 700;
+                    line-height: 1;
+                    display: inline-block;
+                    margin: 0;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-logo-img {
+                    width: 14px;
+                    height: 14px;
+                    display: block;
+                }
+                #amaes-nav-tabs {
+                    display: grid;
+                    grid-template-columns: repeat(4, minmax(0, 1fr));
+                    gap: 3px;
+                    background: rgba(0,0,0,0.25);
+                    padding: 3px;
+                    border-radius: 8px;
+                    margin-bottom: 6px;
+                    border: 1px solid var(--border-subtle);
+                    flex-shrink: 0;
+                }
+
+                .amaes-tab-btn {
+                    align-items: center;
+                    display: inline-flex;
+                    gap: 4px;
+                    justify-content: center;
+                    min-width: 0;
+                    padding: 5px 2px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    border: 1px solid transparent;
+                    border-radius: 6px;
+                    background: transparent;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                    text-align: center;
+                    white-space: nowrap;
+                    user-select: none;
+                    width: 100%;
+                }
+
+                .amaes-tab-btn span {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .amaes-tab-btn:hover {
+                    color: var(--text-primary);
+                    background: rgba(255,255,255,0.05);
+                }
+
+                .amaes-tab-btn.active {
+                    background: var(--surface);
+                    color: var(--text-primary);
+                    border-color: var(--border);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+                }
+
+                .amaes-tab-pane {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+
+                #amaes-panel-body {
+                    overflow-y: auto !important;
+                    overflow-x: hidden !important;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    padding-right: 4px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    margin-top: 6px;
+                }
+
+                #amaes-panel-body::-webkit-scrollbar {
+                    width: 5px;
+                }
+                #amaes-panel-body::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                #amaes-panel-body::-webkit-scrollbar-thumb {
+                    background: var(--border);
+                    border-radius: 4px;
+                }
+                #amaes-panel-body::-webkit-scrollbar-thumb:hover {
+                    background: var(--text-muted);
+                }
+
+                #amaes-status {
+                    flex: 1 1 0%;
+                    min-width: 0;
+                    max-width: 100%;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    display: block;
+                }
+                #amaes-btn-toggle-logs {
+                    flex-shrink: 0;
+                    margin-left: auto;
+                    z-index: 2;
+                }
+
+                @keyframes amaes-dot-pulse {
+                    0% { transform: scale(1); filter: brightness(1); }
+                    50% { transform: scale(1.5); filter: brightness(1.35); }
+                    100% { transform: scale(1); filter: brightness(1); }
+                }
+                .amaes-pulse {
+                    animation: amaes-dot-pulse 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+
+                .amaes-inline-btn {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 5px !important;
+                    width: auto !important;
+                    max-width: max-content !important;
+                    flex-shrink: 0 !important;
+                    padding: 4px 10px !important;
+                    border-radius: 6px !important;
+                    border: none !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    cursor: pointer !important;
+                    white-space: nowrap !important;
+                    box-sizing: border-box !important;
+                    text-align: center !important;
+                }
+
+                .amaes-copy-ai-card-btn {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 4px !important;
+                    background: #eff6ff !important;
+                    color: #1d4ed8 !important;
+                    border: 1px solid #bfdbfe !important;
+                    padding: 4px 4px !important;
+                    border-radius: 6px !important;
+                    font-size: 10px !important;
+                    font-weight: 600 !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease !important;
+                    user-select: none !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+                    margin-top: 4px !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    white-space: nowrap !important;
+                    text-align: center !important;
+                }
+
+                .amaes-copy-ai-card-btn:hover {
+                    background: #dbeafe !important;
+                    border-color: #3b82f6 !important;
+                    color: #1e40af !important;
+                    box-shadow: 0 2px 4px rgba(37,99,235,0.12) !important;
+                }
+
+                .amaes-ask-ai-card-btn {
+                    background: #faf5ff !important;
+                    color: #7e22ce !important;
+                    border: 1px solid #e9d5ff !important;
+                }
+
+                .amaes-ask-ai-card-btn:hover {
+                    background: #f3e8ff !important;
+                    border-color: #a855f7 !important;
+                    color: #6b21a8 !important;
+                    box-shadow: 0 2px 4px rgba(168,85,247,0.15) !important;
+                }
+
+                .amaes-copy-ai-card-btn svg {
+                    width: 12px !important;
+                    height: 12px !important;
+                    flex-shrink: 0 !important;
+                }
+
+                .amaes-web-ai-container {
+                    position: relative !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    margin-top: 3px !important;
+                }
+
+                .amaes-web-ai-split-btn {
+                    display: flex !important;
+                    align-items: stretch !important;
+                    width: 100% !important;
+                    border-radius: 6px !important;
+                    border: 1px solid #bbf7d0 !important;
+                    background: #f0fdf4 !important;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+                    transition: all 0.15s ease !important;
+                }
+
+                .amaes-web-ai-split-btn:hover {
+                    border-color: #86efac !important;
+                    box-shadow: 0 2px 4px rgba(22, 101, 52, 0.12) !important;
+                }
+
+                .amaes-web-ai-main-action {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 3px !important;
+                    background: transparent !important;
+                    border: none !important;
+                    color: #15803d !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    padding: 4px 4px !important;
+                    cursor: pointer !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    transition: background 0.15s ease !important;
+                    min-height: 24px !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-main-action:hover {
+                    background: #dcfce7 !important;
+                    color: #166534 !important;
+                }
+
+                .amaes-web-ai-arrow-btn {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    background: rgba(21, 128, 61, 0.08) !important;
+                    border: none !important;
+                    border-left: 1px solid #bbf7d0 !important;
+                    color: #15803d !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    padding: 0 7px !important;
+                    cursor: pointer !important;
+                    transition: background 0.15s ease !important;
+                    min-height: 24px !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-arrow-btn:hover {
+                    background: #bbf7d0 !important;
+                    color: #14532d !important;
+                }
+
+                .amaes-card-btn-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    margin-top: 6px;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .amaes-card-ai-actions {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                /* Completely hide side buttons and redundant whole-card AI on matching/composite or answered questions */
+                .que.match .amaes-card-btn-container,
+                .que.qtype_match .amaes-card-btn-container,
+                .que[data-composite="true"] .amaes-card-btn-container,
+                .que.match .amaes-ai-matching-run-btn,
+                .que.qtype_match .amaes-ai-matching-run-btn,
+                .que[data-composite="true"] .amaes-ai-matching-run-btn,
+                .que[data-answered="true"] .amaes-card-btn-container,
+                .que[data-answered="true"] .amaes-web-ai-row {
+                    display: none !important;
+                }
+
+                .amaes-copy-ai-card-btn {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 6px !important;
+                    padding: 5px 9px !important;
+                    border-radius: 6px !important;
+                    font-size: 11px !important;
+                    font-weight: 600 !important;
+                    background: rgba(37, 99, 235, 0.08) !important;
+                    color: #2563eb !important;
+                    border: 1px solid rgba(37, 99, 235, 0.28) !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease !important;
+                    box-sizing: border-box !important;
+                    line-height: 1.3 !important;
+                    width: 100% !important;
+                    user-select: none !important;
+                    text-align: center !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+                }
+                .amaes-copy-ai-card-btn:hover,
+                .amaes-copy-ai-card-btn:active {
+                    background: rgba(37, 99, 235, 0.16) !important;
+                    border-color: #2563eb !important;
+                    color: #1d4ed8 !important;
+                    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.12) !important;
+                }
+
+                .amaes-paste-ai-card-btn {
+                    background: rgba(245, 158, 11, 0.08) !important;
+                    color: #d97706 !important;
+                    border-color: rgba(245, 158, 11, 0.28) !important;
+                }
+                .amaes-paste-ai-card-btn:hover,
+                .amaes-paste-ai-card-btn:active {
+                    background: rgba(245, 158, 11, 0.16) !important;
+                    border-color: #d97706 !important;
+                    color: #b45309 !important;
+                    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.12) !important;
+                }
+
+                /* Built-in AI Section (Left Sidebar) */
+                .amaes-builtin-ai-section {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 3px !important;
+                    margin-top: 5px !important;
+                    padding-top: 5px !important;
+                    border-top: 1px solid rgba(226, 232, 240, 0.9) !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-builtin-ai-header {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 4px !important;
+                    font-size: 9px !important;
+                    font-weight: 700 !important;
+                    color: #8b5cf6 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.5px !important;
+                    user-select: none !important;
+                }
+
+                .amaes-ask-ai-card-btn {
+                    background: rgba(139, 92, 246, 0.08) !important;
+                    color: #7c3aed !important;
+                    border: 1px solid rgba(139, 92, 246, 0.28) !important;
+                }
+                .amaes-ask-ai-card-btn:hover,
+                .amaes-ask-ai-card-btn:active {
+                    background: rgba(139, 92, 246, 0.16) !important;
+                    border-color: #7c3aed !important;
+                    color: #6d28d9 !important;
+                    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.12) !important;
+                }
+
+                /* Web AI Launcher Row (Right Side - Question Header) */
+                .amaes-web-ai-row {
+                    display: inline-flex !important;
+                    flex-wrap: wrap !important;
+                    gap: 5px !important;
+                    align-items: center !important;
+                    margin: 2px 0 6px 0 !important;
+                    padding: 2px 6px !important;
+                    background: rgba(148, 163, 184, 0.08) !important;
+                    border: 1px solid rgba(148, 163, 184, 0.18) !important;
+                    border-radius: 14px !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-label {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 4px !important;
+                    font-size: 9px !important;
+                    font-weight: 700 !important;
+                    color: #94a3b8 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.5px !important;
+                    user-select: none !important;
+                    padding: 0 2px !important;
+                    margin-right: 2px !important;
+                }
+
+                .amaes-web-ai-item {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 4px !important;
+                    padding: 2px 7px !important;
+                    border-radius: 10px !important;
+                    font-size: 10px !important;
+                    font-weight: 600 !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease !important;
+                    box-sizing: border-box !important;
+                    user-select: none !important;
+                    touch-action: manipulation !important;
+                    line-height: 1.3 !important;
+                    white-space: nowrap !important;
+                    background: rgba(255, 255, 255, 0.9) !important;
+                    border: 1px solid rgba(203, 213, 225, 0.7) !important;
+                    color: #475569 !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+                }
+
+                .amaes-web-ai-item svg {
+                    width: 11px !important;
+                    height: 11px !important;
+                    flex-shrink: 0 !important;
+                }
+
+                .amaes-web-ai-item.amaes-pill-chatgpt:hover,
+                .amaes-web-ai-item.amaes-pill-chatgpt:active {
+                    background: #f0fdf4 !important;
+                    border-color: #10a37f !important;
+                    color: #047857 !important;
+                    box-shadow: 0 1px 4px rgba(16, 163, 127, 0.15) !important;
+                }
+
+                .amaes-web-ai-item.amaes-pill-gemini:hover,
+                .amaes-web-ai-item.amaes-pill-gemini:active {
+                    background: #faf5ff !important;
+                    border-color: #8b5cf6 !important;
+                    color: #7c3aed !important;
+                    box-shadow: 0 1px 4px rgba(139, 92, 246, 0.15) !important;
+                }
+
+                .amaes-web-ai-item.amaes-pill-perplexity:hover,
+                .amaes-web-ai-item.amaes-pill-perplexity:active {
+                    background: #f0fdfa !important;
+                    border-color: #06b6d4 !important;
+                    color: #0891b2 !important;
+                    box-shadow: 0 1px 4px rgba(6, 182, 212, 0.15) !important;
+                }
+
+                /* Active / Focused Question Card Highlight */
+                .que.amaes-active-focus-que {
+                    outline: 2.5px solid #2563eb !important;
+                    outline-offset: 3px !important;
+                    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.18) !important;
+                    border-radius: 8px !important;
+                    transition: outline 0.15s ease, box-shadow 0.15s ease !important;
+                }
+                .que:not(.amaes-active-focus-que) {
+                    transition: outline 0.15s ease, box-shadow 0.15s ease;
+                }
+                .que:not(.amaes-active-focus-que):hover {
+                    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+                    cursor: pointer;
+                }
+                .amaes-active-focus-badge {
+                    display: none !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 4px !important;
+                    font-size: 9px !important;
+                    font-weight: 700 !important;
+                    background: #2563eb !important;
+                    color: #ffffff !important;
+                    padding: 3px 5px !important;
+                    border-radius: 5px !important;
+                    margin-bottom: 2px !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.5px !important;
+                    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3) !important;
+                    user-select: none !important;
+                }
+                .amaes-active-focus-badge svg {
+                    width: 10px !important;
+                    height: 10px !important;
+                }
+                .que.amaes-active-focus-que .amaes-active-focus-badge {
+                    display: none !important;
+                }
+
+                .que.amaes-no-answer-que {
+                    border-left: 4px solid var(--accent-amber, #f59e0b) !important;
+                }
+
+                /* Choice Row Highlight Styling */
+                .amaes-highlighted-choice {
+                    border-radius: 6px !important;
+                    transition: all 0.2s ease !important;
+                    box-sizing: border-box !important;
+                }
+                .amaes-highlighted-choice p {
+                    display: inline !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                .amaes-highlighted-choice label {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 6px !important;
+                    margin: 0 !important;
+                    cursor: pointer !important;
+                    background: transparent !important;
+                    outline: none !important;
+                    padding: 0 !important;
+                }
+
+                #amaes-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding-bottom: 8px;
+                    border-bottom: 1px solid var(--border-subtle);
+                    gap: 8px;
+                }
+
+                #amaes-brand {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    min-width: 0;
+                    flex-shrink: 1;
+                }
+
+                #amaes-logo-link {
+                    display: inline-flex;
+                    align-items: center;
+                    text-decoration: none;
+                    cursor: pointer;
+                    flex-shrink: 0;
+                    border-radius: 4px;
+                    outline: none;
+                }
+
+                #amaes-logo-link:hover #amaes-logo-img,
+                #amaes-logo-link:focus-visible #amaes-logo-img {
+                    transform: scale(1.08);
+                    filter: drop-shadow(0 2px 6px rgba(16, 185, 129, 0.45));
+                }
+
+                #amaes-logo-img {
+                    height: 24px;
+                    width: auto;
+                    display: block;
+                    flex-shrink: 0;
+                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+                    transition: transform 0.15s ease, filter 0.15s ease;
+                }
+
+                #amaes-title-group {
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                    min-width: 0;
+                }
+
+                #amaes-title {
+                    font-weight: 700;
+                    font-size: 13px;
+                    letter-spacing: -0.2px;
+                    color: var(--text-primary);
+                    white-space: nowrap;
+                }
+
+                #amaes-version-pill {
+                    font-size: 9px;
+                    font-weight: 600;
+                    padding: 1px 4px;
+                    border-radius: 4px;
+                    background: var(--surface);
+                    color: var(--text-muted);
+                    border: 1px solid var(--border);
+                    white-space: nowrap;
+                }
+
+                #amaes-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 3px;
+                    flex-shrink: 0;
+                    min-width: max-content;
+                }
+
+                .amaes-icon-btn {
+                    width: 26px;
+                    height: 26px;
+                    background: var(--surface);
+                    color: var(--text-secondary);
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 1px solid var(--border);
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                    box-sizing: border-box;
+                    padding: 0;
+                    flex-shrink: 0;
+                }
+
+                .amaes-icon-btn:hover {
+                    color: var(--text-primary);
+                    border-color: var(--text-muted);
+                }
+
+                .amaes-debug-btn {
+                    color: var(--accent-amber);
+                    border-color: rgba(245, 158, 11, 0.4);
+                }
+
+                .amaes-card {
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    margin-top: 8px;
+                    margin-bottom: 8px;
+                    overflow: hidden;
+                    background: var(--surface-subtle);
+                }
+
+                .amaes-card-header {
+                    padding: 8px 10px;
+                    background: var(--surface);
+                    font-weight: 600;
+                    color: var(--text-primary);
+                    cursor: pointer;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .amaes-subcard {
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    overflow: hidden;
+                    background: var(--bg);
+                }
+
+                .amaes-subcard-header {
+                    padding: 6px 8px;
+                    background: var(--surface);
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .sub-label {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 11px;
+                    white-space: nowrap;
+                }
+
+                .arrow-container {
+                    display: inline-flex;
+                    align-items: center;
+                    color: var(--text-muted);
+                    transition: transform 0.15s ease;
+                    flex-shrink: 0;
+                }
+
+                .amaes-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 6px 9px;
+                    font-size: 11px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: filter 0.15s ease, background 0.15s ease, transform 0.1s ease;
+                    text-align: left;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                .amaes-btn:active {
+                    transform: scale(0.97);
+                    filter: brightness(0.92);
+                }
+
+                .amaes-btn-preview {
+                    background: var(--surface);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border);
+                    font-weight: 600;
+                    justify-content: center;
+                }
+                .amaes-btn-preview:hover {
+                    border-color: var(--text-muted);
+                }
+
+                .amaes-btn-monotone {
+                    background: var(--surface);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border);
+                    font-weight: 500;
+                    border-radius: 4px;
+                }
+                .amaes-btn-monotone:hover {
+                    background: var(--surface-subtle);
+                    border-color: var(--text-muted);
+                    color: var(--text-primary);
+                }
+
+                .amaes-btn-blue {
+                    background: var(--accent-blue);
+                    color: #ffffff;
+                }
+                .amaes-btn-blue:hover {
+                    background: var(--accent-blue-hover);
+                }
+
+                .amaes-btn-green {
+                    background: var(--accent-green);
+                    color: #ffffff;
+                }
+                .amaes-btn-green:hover {
+                    background: var(--accent-green-hover);
+                }
+
+                .amaes-btn-pink {
+                    background: var(--accent-pink);
+                    color: #ffffff;
+                }
+                .amaes-btn-pink:hover {
+                    background: var(--accent-pink-hover);
+                }
+
+                .amaes-btn-gray {
+                    background: var(--surface);
+                    color: var(--text-secondary);
+                    border: 1px solid var(--border);
+                }
+                .amaes-btn-gray:hover {
+                    color: var(--text-primary);
+                }
+
+                .amaes-btn-outline {
+                    background: var(--surface);
+                    color: var(--text-secondary);
+                    border: 1px solid var(--border);
+                }
+                .amaes-btn-outline:hover {
+                    color: var(--text-primary);
+                }
+
+                .amaes-text-blue { color: var(--accent-blue) !important; }
+                .amaes-text-pink { color: var(--accent-pink) !important; }
+                .amaes-text-purple { color: var(--accent-purple) !important; }
+
+                .amaes-btn-stop {
+                    background: var(--accent-pink);
+                    color: #ffffff;
+                    font-weight: 600;
+                    justify-content: center;
+                }
+
+                .amaes-status-box {
+                    padding: 8px;
+                    background: var(--status-bg);
+                    border-radius: 6px;
+                    font-size: 11px;
+                    line-height: 1.4;
+                    color: var(--text-secondary);
+                    max-height: 80px;
+                    overflow-y: auto;
+                    border: 1px solid var(--border-subtle);
+                }
+
+                @keyframes amaes-spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                @keyframes amaes-ai-progress {
+                    0% { width: 10%; transform: translateX(0); }
+                    50% { width: 60%; transform: translateX(50%); }
+                    100% { width: 10%; transform: translateX(120%); }
+                }
+
+                .amaes-ai-spin {
+                    animation: amaes-spin 1.2s linear infinite;
+                    display: inline-block;
+                }
+
+                .amaes-ai-thinking-indicator {
+                    box-sizing: border-box;
+                    width: 100%;
+                }
+
+                .amaes-ai-progress-bar {
+                    animation: amaes-ai-progress 2s ease-in-out infinite;
+                }
+
+                .amaes-ai-suggested-choice {
+                    outline: 2px solid rgba(139, 92, 246, 0.85) !important;
+                    background-color: rgba(139, 92, 246, 0.09) !important;
+                    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2) !important;
+                    border-radius: 6px !important;
+                }
+
+                .amaes-ai-suggested-badge {
+                    user-select: none;
+                }
+
+                .amaes-ai-question-tag {
+                    user-select: none;
+                }
+
+                /* ========================================================== */
+                /* RESPONSIVE DESIGN & MOBILE/TABLET OPTIMIZATIONS           */
+                /* ========================================================== */
+
+                /* Global Touch Optimizations */
+                .amaes-btn,
+                .amaes-icon-btn,
+                .amaes-tab-btn,
+                .amaes-copy-ai-card-btn,
+                .amaes-web-ai-item,
+                .amaes-que-stop-btn {
+                    touch-action: manipulation;
+                }
+
+                /* Mobile Bottom Sheet Backdrop */
+                #amaes-panel-backdrop {
+                    display: none;
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(15, 23, 42, 0.55);
+                    backdrop-filter: blur(3px);
+                    -webkit-backdrop-filter: blur(3px);
+                    z-index: 999998;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.25s ease;
+                }
+
+                .amaes-sheet-handle {
+                    display: none;
+                }
+
+                /* Mobile Viewports (Phones & Small Screens <= 640px) */
+                @media (max-width: 640px) {
+                    #amaes-panel-backdrop.active {
+                        display: block !important;
+                        opacity: 1 !important;
+                        pointer-events: auto !important;
+                    }
+
+                    .amaes-sheet-handle {
+                        display: block !important;
+                        width: 36px !important;
+                        height: 4px !important;
+                        border-radius: 2px !important;
+                        background: var(--border, #475569) !important;
+                        margin: 0 auto 8px auto !important;
+                        flex-shrink: 0 !important;
+                        cursor: pointer !important;
+                    }
+                    #amaes-toolkit-panel.amaes-minimized .amaes-sheet-handle {
+                        display: none !important;
+                    }
+
+                    /* Expanded Panel -> Full Mobile Bottom Sheet */
+                    #amaes-toolkit-panel:not(.amaes-minimized) {
+                        left: 0 !important;
+                        right: 0 !important;
+                        bottom: 0 !important;
+                        top: auto !important;
+                        width: 100% !important;
+                        max-width: 100vw !important;
+                        max-height: 80vh !important;
+                        max-height: calc(85dvh - env(safe-area-inset-bottom, 0px)) !important;
+                        border-radius: 16px 16px 0 0 !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        border-bottom: none !important;
+                        padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 12px)) 14px !important;
+                        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important;
+                        z-index: 999999 !important;
+                    }
+
+                    /* Minimized Panel -> Compact Touch FAB Pill */
+                    #amaes-toolkit-panel.amaes-minimized {
+                        bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+                        right: calc(14px + env(safe-area-inset-right, 0px)) !important;
+                        left: auto !important;
+                        top: auto !important;
+                        height: 34px !important;
+                        min-height: 34px !important;
+                        padding: 0 10px !important;
+                        border-radius: 22px !important;
+                        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+                        max-width: calc(100vw - 28px) !important;
+                    }
+
+                    /* Responsive Header & Action Buttons */
+                    #amaes-header {
+                        padding-bottom: 6px !important;
+                    }
+                    .amaes-icon-btn {
+                        width: 28px !important;
+                        height: 28px !important;
+                    }
+
+                    /* Tabs in Bottom Sheet */
+                    #amaes-nav-tabs {
+                        gap: 2px !important;
+                        padding: 2px !important;
+                        margin-bottom: 5px !important;
+                    }
+                    .amaes-tab-btn {
+                        padding: 6px 2px !important;
+                        font-size: 10px !important;
+                    }
+
+                    /* Quiz HUD Collision Prevention */
+                    #amaes-quiz-hud {
+                        bottom: calc(52px + env(safe-area-inset-bottom, 10px)) !important;
+                        left: 10px !important;
+                        right: auto !important;
+                        max-width: calc(100vw - 20px) !important;
+                        padding: 4px 10px !important;
+                        font-size: 10px !important;
+                        gap: 6px !important;
+                        border-radius: 20px !important;
+                    }
+                    #amaes-quiz-hud #hud-question-progress {
+                        display: none !important;
+                    }
+
+                    /* Top Navigation Update Item */
+                    #amaes-topnav-update-btn span,
+                    #amaes-topnav-update-item span {
+                        max-width: 130px !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                        white-space: nowrap !important;
+                        font-size: 10px !important;
+                        padding: 2px 7px !important;
+                    }
+
+                    /* Toast Notification */
+                    #amaes-toast-notification {
+                        top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+                        left: 12px !important;
+                        right: 12px !important;
+                        max-width: calc(100vw - 24px) !important;
+                        font-size: 11px !important;
+                        justify-content: center !important;
+                    }
+
+                    /* Modal Dialogs */
+                    #amaes-welcome-modal,
+                    #amaes-gemini-modal,
+                    #amaes-bug-modal,
+                    #amaes-contribute-modal,
+                    #amaes-full-qr-modal,
+                    #amaes-dev-modal {
+                        padding: 8px !important;
+                    }
+                    #amaes-welcome-card,
+                    #amaes-gemini-modal > div,
+                    #amaes-bug-modal > div,
+                    #amaes-contribute-modal > div,
+                    #amaes-full-qr-modal > div,
+                    #amaes-dev-modal > div {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        max-height: 94dvh !important;
+                        border-radius: 12px !important;
+                    }
+                    #amaes-welcome-header {
+                        padding: 12px 14px 10px !important;
+                    }
+                    #amaes-welcome-title {
+                        font-size: 14px !important;
+                    }
+                    #amaes-welcome-scroll-container {
+                        padding: 12px 14px !important;
+                        gap: 12px !important;
+                    }
+                    #btn-welcome-close,
+                    #amaes-gemini-modal-close,
+                    #amaes-bug-modal-close {
+                        min-width: 36px !important;
+                        min-height: 36px !important;
+                        display: inline-flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        font-size: 22px !important;
+                    }
+                }
+
+                /* Tablets & Medium Screens (641px to 1024px) */
+                @media (min-width: 641px) and (max-width: 1024px) {
+                    #amaes-toolkit-panel:not(.amaes-minimized) {
+                        width: 320px !important;
+                        max-height: calc(100vh - 60px) !important;
+                        bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+                        right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+                    }
+                    #amaes-toolkit-panel.amaes-minimized {
+                        bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+                        right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+                    }
+                }
+
+                /* In-Question Card Responsive Layout (All Mobile & Tablet Screens <= 768px) */
+                @media (max-width: 768px) {
+                    .que .info {
+                        padding-bottom: 2px !important;
+                        margin-bottom: 4px !important;
+                    }
+                    .que.match .amaes-card-btn-container,
+                    .que.qtype_match .amaes-card-btn-container,
+                    .que[data-composite="true"] .amaes-card-btn-container {
+                        display: none !important;
+                    }
+                    .amaes-card-btn-container {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        flex-wrap: wrap !important;
+                        align-items: center !important;
+                        gap: 4px !important;
+                        margin-top: 3px !important;
+                        margin-bottom: 3px !important;
+                        width: 100% !important;
+                    }
+                    .amaes-card-ai-actions {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        flex-wrap: wrap !important;
+                        align-items: center !important;
+                        gap: 4px !important;
+                        width: 100% !important;
+                    }
+                    .amaes-copy-ai-card-btn,
+                    .amaes-paste-ai-card-btn,
+                    .amaes-ask-ai-card-btn {
+                        flex: 1 1 auto !important;
+                        width: auto !important;
+                        min-width: 70px !important;
+                        padding: 4px 8px !important;
+                        font-size: 10px !important;
+                        height: 28px !important;
+                        box-sizing: border-box !important;
+                        border-radius: 6px !important;
+                    }
+                    .amaes-builtin-ai-section {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        align-items: center !important;
+                        gap: 4px !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        border-top: none !important;
+                        flex: 1 1 auto !important;
+                        width: auto !important;
+                    }
+                    .amaes-builtin-ai-header {
+                        display: none !important;
+                    }
+                    .amaes-active-focus-badge {
+                        width: auto !important;
+                        padding: 2px 6px !important;
+                        font-size: 8.5px !important;
+                        margin-bottom: 0 !important;
+                        border-radius: 4px !important;
+                    }
+                    .amaes-web-ai-row {
+                        margin: 2px 0 4px 0 !important;
+                        padding: 2px 5px !important;
+                        gap: 3px !important;
+                        border-radius: 8px !important;
+                    }
+                    .amaes-web-ai-item {
+                        padding: 3px 6px !important;
+                        font-size: 9.5px !important;
+                        min-height: 24px !important;
+                    }
+                    .amaes-que-top-toolbar {
+                        margin-bottom: 4px !important;
+                    }
+                }
+            `;
+
+            const themeBtn = document.getElementById('amaes-theme-btn');
+            if (themeBtn) {
+                themeBtn.innerHTML = currentTheme === 'dark' 
+                    ? `${ICONS.sun} <span>Light Mode</span>` 
+                    : `${ICONS.moon} <span>Dark Mode</span>`;
+            }
+        }
+
+        window._amaesUpdatePanelTheme = updatePanelThemeStyles;
+        updatePanelThemeStyles(currentTheme);
+
+        // UI References
+        const statusEl = document.getElementById('amaes-status');
+        const stopBtn = document.getElementById('amaes-stop-btn');
+        const minBtn = document.getElementById('amaes-min-btn');
+        const bodyEl = document.getElementById('amaes-panel-body');
+        const debugBtn = document.getElementById('amaes-debug-btn');
+        const themeBtn = document.getElementById('amaes-theme-btn');
+
+// Global setLog used
+
+        // Helper: Accordion with automatic state persistence in localStorage
+        function setupPersistentAccordion(headerId, bodyId, arrowId, storageKey, defaultOpen = false) {
+            const header = document.getElementById(headerId);
+            const body = document.getElementById(bodyId);
+            const arrow = document.getElementById(arrowId);
+            if (!header || !body) return;
+
+            const saved = localStorage.getItem(storageKey);
+            const isOpen = saved !== null ? (saved === 'open') : defaultOpen;
+            body.style.display = isOpen ? 'flex' : 'none';
+            if (arrow) arrow.innerHTML = isOpen ? ICONS.chevronDown : ICONS.chevronRight;
+
+            header.onclick = () => {
+                const isCurrentlyHidden = body.style.display === 'none';
+                body.style.display = isCurrentlyHidden ? 'flex' : 'none';
+                if (arrow) arrow.innerHTML = isCurrentlyHidden ? ICONS.chevronDown : ICONS.chevronRight;
+                localStorage.setItem(storageKey, isCurrentlyHidden ? 'open' : 'closed');
+            };
+        }
+
+        
+        // Tab Navigation Logic (Strict 3-Tab Grid: Quiz, DB, Course Tools)
+        const tabBtns = document.querySelectorAll('.amaes-tab-btn');
+        const tabPanes = {
+            quiz: document.getElementById('tab-pane-quiz'),
+            db: document.getElementById('tab-pane-db'),
+            course: document.getElementById('tab-pane-course'),
+            accounts: document.getElementById('tab-pane-accounts')
+        };
+
+        function switchTab(tabName) {
+            tabBtns.forEach(btn => {
+                if (btn.dataset.tab === tabName) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            Object.keys(tabPanes).forEach(name => {
+                if (tabPanes[name]) {
+                    tabPanes[name].style.display = (name === tabName) ? 'flex' : 'none';
+                }
+            });
+            localStorage.setItem('amaes_active_tab', tabName);
+        }
+
+        tabBtns.forEach(btn => {
+            btn.onclick = () => switchTab(btn.dataset.tab);
+        });
+
+        // Initial Tab Selection: Auto-open to 'quiz'
+        let initialTab = localStorage.getItem('amaes_active_tab') || 'quiz';
+        switchTab(initialTab);

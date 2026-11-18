@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install AMAES Toolkit for Chrome, Edge, and Firefox with a live preview, migration guide, and status check.">
+  <link rel="canonical" href="https://study-tool-amaes.pages.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://study-tool-amaes.pages.dev/">
+  <meta property="og:title" content="AMAES Toolkit | Browser Extension">
+  <meta property="og:description" content="Install the AMAES Toolkit browser extension with step-by-step guidance, live interface preview, and status checking.">
+  <meta property="og:image" content="https://study-tool-amaes.pages.dev/assets/amaes-toolkit-logo.png">
+  <meta property="og:image:alt" content="AMAES Toolkit shield-terminal logo">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="AMAES Toolkit | Browser Extension">
+  <meta name="twitter:description" content="Install the AMAES Toolkit browser extension with step-by-step guidance and status checking.">
+  <meta name="twitter:image" content="https://study-tool-amaes.pages.dev/assets/amaes-toolkit-logo.png">
+  <title>AMAES Toolkit | Browser Extension</title>
+  <link rel="icon" type="image/png" href="assets/amaes-toolkit-logo.png">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img src="assets/amaes-toolkit-logo.png" alt="" aria-hidden="true"><span><strong>AMAES</strong> Toolkit</span></a>
+    <nav class="top-links" aria-label="Site links">
+      <a class="github-link" href="#migration-step">Upgrading?</a>
+      <a class="github-link" href="#share-step">Share</a>
+      <a class="github-link" href="#terms">Terms &amp; Disclaimer</a>
+      <a class="github-link" href="#about">About</a>
+      <a class="github-link" href="dashboard.html">Dashboard</a>
+      <a class="github-link" id="top-database-link" href="https://github.com/Study-Tool/database" target="_blank" rel="noreferrer">Database</a>
+      <a class="github-link" id="top-repo-link" href="https://github.com/Study-Tool/amaes" target="_blank" rel="noreferrer">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Answer once · 1-click next time · Standalone Extension</div>
+      <h1><span class="hero-title-line"><span>Install AMAES Toolkit in 60 seconds.</span><span class="release-badge" id="hero-version-badge">v0.1.0</span></span></h1>
+      <p class="hero-copy">When one student answers a question on Moodle, everyone gets the verified answer next time. Built as a standalone extension for Chrome, Edge, and Firefox with automatic updates and a daily public answer archive.</p>
+      <div class="inline-site-notice" id="hero-announcement" hidden></div>
+    </section>
+
+    <section class="dashboard-body" aria-label="Demo and installation steps">
+      <div class="demo-column">
+        <div class="demo-stage">
+          <video autoplay muted loop playsinline preload="auto" poster="assets/amaes-toolkit-live-demo.gif" aria-label="AMAES Toolkit interface preview">
+            <source src="assets/amaes-toolkit-live-demo.mp4" type="video/mp4">
+          </video>
+        </div>
+        <p class="muted">Interface preview · AMAES Toolkit does not submit quizzes automatically.</p>
+      </div>
+
+      <div class="action-grid" aria-label="Installation steps">
+        <article class="action-card" id="browser-step">
+          <div class="card-kicker">STEP 1</div>
+          <h2>Choose your browser</h2>
+          <p>Detected: <strong id="browser-name">your browser</strong></p>
+          <div class="browser-grid" role="group" aria-label="Browser choices">
+            <button class="browser-choice" data-browser="chrome"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Google_Chrome_icon_(February_2022).svg?width=64" alt="Google Chrome logo"><span>Chrome</span></button>
+            <button class="browser-choice" data-browser="edge"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Microsoft_Edge_logo_(2019).svg?width=64" alt="Microsoft Edge logo"><span>Edge</span></button>
+            <button class="browser-choice" data-browser="firefox"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Firefox_logo,_2019.svg?width=64" alt="Firefox logo"><span>Firefox</span></button>
+            <button class="browser-choice" data-browser="other"><span class="generic-browser-icon" aria-hidden="true"></span><span>Other</span></button>
+          </div>
+        </article>
+
+        <article class="action-card" id="install-step">
+          <div class="card-kicker">STEP 2</div>
+          <h3 id="download-step-title">Download AMAES Toolkit</h3>
+          <p id="download-step-desc">No extra add-on needed. Download AMAES Toolkit for your browser right here.</p>
+          <a class="button primary" id="download-link" href="downloads/amaes-toolkit-chrome-mv3.zip" download="amaes-toolkit-chrome-mv3.zip">Download AMAES Toolkit for Chrome</a>
+          <div class="ext-url-bar">
+            <code id="ext-page-url">chrome://extensions</code>
+            <button class="button outline copy-url-btn" id="copy-ext-url-btn" type="button">Copy Extensions URL</button>
+            <span class="copy-url-feedback" id="copy-ext-url-feedback" aria-live="polite"></span>
+          </div>
+          <div class="manager-instructions" id="install-instructions">
+            <span>1</span><p>Click <strong>Download AMAES Toolkit</strong> above and extract the <code>.zip</code> into a folder you will keep.</p>
+            <span>2</span><p id="browser-load-text"><strong>Chrome &amp; Brave:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar (<code>Ctrl+L</code> then <code>Ctrl+V</code>), turn <strong>Developer mode</strong> ON (top right), click <strong>Load unpacked</strong>, and select the extracted folder.</p>
+            <span>3</span><p><strong>Switching from Violentmonkey?</strong> Disable the old userscript so AMAES Toolkit does not run twice—your settings move over automatically.</p>
+          </div>
+        </article>
+
+        <article class="action-card status-action" id="toolkit-step">
+          <div class="card-kicker" id="toolkit-step-kicker">STEP 3</div>
+          <h2 id="toolkit-step-title">Open Moodle &amp; Verify</h2>
+          <p id="status-copy">Log into your Moodle portal and verify that AMAES Toolkit is active on this browser.</p>
+          <div class="inline-update-banner" id="inline-update-banner" hidden>
+            <div class="inline-update-text">
+              <strong id="inline-update-title">A newer version of AMAES Toolkit is available</strong>
+              <span id="inline-update-desc">Download the latest package in Step 2 and reload the extension to update.</span>
+            </div>
+            <a class="button primary inline-update-btn" id="inline-update-btn" href="downloads/amaes-toolkit-chrome-mv3.zip" download="amaes-toolkit-chrome-mv3.zip">Download Update</a>
+          </div>
+          <a class="button secondary" href="https://semestral.amaes.com/" target="_blank" rel="noreferrer">Open semestral.amaes.com</a>
+          <p class="install-terms-note" style="margin-top: 10px;">By installing, you agree to the <a href="#terms">Terms of Use &amp; Disclaimer</a>.</p>
+          <div class="active-actions" id="active-actions" hidden>
+            <a class="subdued-link" href="dashboard.html">Open Status Dashboard</a>
+            <a class="subdued-link" id="reinstall-link" href="downloads/amaes-toolkit-chrome-mv3.zip" download>Download Latest Package</a>
+          </div>
+          <div class="status-block">
+            <div class="check-actions">
+              <button class="button outline" id="check-button" type="button">Check status</button>
+              <span class="check-result" id="check-result" aria-live="polite"></span>
+              <span class="version-result" id="version-result" aria-live="polite"></span>
+            </div>
+            <p>Latest version: <strong class="release-badge" id="release-version">checking...</strong> · Service: <strong id="relay-health-badge">checking...</strong></p>
+          </div>
+        </article>
+
+        <article class="action-card" id="migration-step">
+          <div class="card-kicker">UPGRADING FROM VIOLENTMONKEY</div>
+          <h2>Move your data seamlessly</h2>
+          <div class="manager-instructions" style="margin-top: 8px;">
+            <span>1</span><p><strong>Settings &amp; Gemini API keys:</strong> Copied automatically into AMAES Toolkit on your first visit to Moodle.</p>
+            <span>2</span><p><strong>Saved Account Switcher logins:</strong> Before turning off the old script, open <strong>Setup Transfer</strong> in the old panel and create a one-time transfer code, then import that code in the new extension.</p>
+            <span>3</span><p><strong>Turn off the old script:</strong> Disable <code>amaes-toolkit.user.js</code> inside Violentmonkey and refresh Moodle.</p>
+          </div>
+        </article>
+
+        <article class="action-card qr-card" id="share-step">
+          <div class="card-kicker">SHARE</div>
+          <div class="qr-compact-row">
+            <div class="qr-compact-info">
+              <h2>Share AMAES Toolkit</h2>
+              <p>Scan with your phone to open <code>study-tool-amaes.pages.dev</code>, or click the QR code to maximize and download.</p>
+            </div>
+            <a class="qr-download-link" id="qr-card-link" href="assets/amaes-toolkit-qr.png" download="amaes-toolkit-qr.png" title="Click to maximize full screen and download QR code">
+              <div class="qr-image-wrapper">
+                <img src="assets/amaes-toolkit-qr.png" alt="Scan QR code to open https://study-tool-amaes.pages.dev/" width="90" height="90">
+                <div class="qr-hover-overlay">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="15 3 21 3 21 9"/>
+                    <polyline points="9 21 3 21 3 15"/>
+                    <line x1="21" y1="3" x2="14" y2="10"/>
+                    <line x1="3" y1="21" x2="10" y2="14"/>
+                  </svg>
+                  <span>Maximize</span>
+                </div>
+              </div>
+            </a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="terms-card" id="terms" aria-label="Terms of Use and Disclaimer">
+      <div class="card-kicker">LEGAL NOTICE</div>
+      <h2>Terms of Use &amp; Important Disclaimer</h2>
+      <p class="terms-intro">
+        AMAES Toolkit is an independent, unofficial assistive study tool designed for students of AMA Education System and ACLC College. It is <strong>not affiliated with, endorsed by, sponsored by, or operated by</strong> AMA Education System, ACLC, Moodle, or browser vendors.
+      </p>
+      <div class="terms-grid">
+        <div class="terms-item">
+          <h3>Academic Integrity &amp; Responsibility</h3>
+          <p>Use AMAES Toolkit strictly where permitted by your institution. Do not use it to cheat, bypass access controls or proctoring, or submit work violating academic integrity policies. You are solely responsible for your use and coursework submissions.</p>
+        </div>
+        <div class="terms-item">
+          <h3>Privacy &amp; Anonymous Data</h3>
+          <p>AMAES Toolkit does not collect your name, student ID, email address, grades, or Moodle session tokens. Settings and API keys stay in local browser extension storage. Community answer evidence is strictly anonymized and synced daily to the public archive.</p>
+        </div>
+        <div class="terms-item">
+          <h3>"As Is" Warranty &amp; Liability</h3>
+          <p>Provided without warranties of any kind. Authors and contributors are not responsible for academic outcomes, disciplinary actions, lost data, or service interruptions arising from use or misuse.</p>
+        </div>
+      </div>
+      <div class="terms-footer-action">
+        <a class="button secondary" id="terms-link" href="https://github.com/Study-Tool/database/blob/main/TERMS.md" target="_blank" rel="noreferrer">Read Full Legal Terms (TERMS.md)</a>
+      </div>
+    </section>
+
+    <section class="about-card" id="about" aria-label="About AMAES Toolkit">
+      <div class="card-kicker">HOW IT WORKS</div>
+      <h2>One student answers. Everyone gets the answer.</h2>
+      <p class="about-intro">
+        Instead of every student searching for the exact same questions over and over, AMAES Toolkit connects everyone on Moodle to a shared answer pool. When anyone finishes and reviews a quiz, verified answers are saved anonymously and added to the daily public archive.
+      </p>
+      <div class="about-grid">
+        <div class="about-item">
+          <h3>Shared Answer Pool</h3>
+          <p>Answers are saved across quizzes. If another student has already solved the question, the verified answer appears for you immediately.</p>
+        </div>
+        <div class="about-item">
+          <h3>100% Anonymous Sharing</h3>
+          <p>When you review a completed quiz, verified checkmarks are contributed automatically. Zero personal names, student IDs, or logins are ever collected.</p>
+        </div>
+        <div class="about-item">
+          <h3>Autonomous Background Pilot</h3>
+          <p>Runs hands-free across questions and pages. Automatically picks verified answers, resolves fallback study guides, and advances cleanly.</p>
+        </div>
+        <div class="about-item">
+          <h3>Built-in Google Gemini AI</h3>
+          <p>Direct in-quiz AI solving for uncertain questions with in-session caching, elimination guards against known wrong choices, and configurable retries.</p>
+        </div>
+        <div class="about-item">
+          <h3>Online Study Guides</h3>
+          <p>Integrates student study guides (AMAUOED &amp; Jenny's Online) directly into the Study Library with live course match indicators and fallback auto-picking.</p>
+        </div>
+        <div class="about-item">
+          <h3>1-Click Solving &amp; Shortcuts</h3>
+          <p>Auto-highlights correct choices on Moodle, with instant shortcuts like <kbd>C</kbd> to copy for AI, <kbd>V</kbd> to paste AI answers, and 1-click lecture completion.</p>
+        </div>
+      </div>
+      <div class="about-footer-action">
+        <a class="button secondary" id="about-database-link" href="https://github.com/Study-Tool/database" target="_blank" rel="noreferrer">Browse Public Answer Archive</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Privacy-first extension · no personal tracking</span>
+    <span class="footer-links">· <a href="#migration-step">Migration</a> · <a href="#share-step">Share</a> · <a href="#terms">Terms</a> · <a href="#about">About</a> · <a href="dashboard.html">Dashboard</a> · <a id="footer-db-link" href="https://github.com/Study-Tool/database" target="_blank" rel="noreferrer">Database Repo</a> · <a id="footer-repo-link" href="https://github.com/Study-Tool/amaes" target="_blank" rel="noreferrer">Source Repo</a> · <a id="footer-support-link" href="https://github.com/Study-Tool/amaes/issues" target="_blank" rel="noreferrer">Support</a></span>
+  </footer>
+
+  <div class="qr-modal-backdrop" id="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title" hidden>
+    <div class="qr-modal-container">
+      <button class="qr-modal-close" id="qr-modal-close" type="button" aria-label="Close fullscreen QR view">&times;</button>
+      <div class="qr-modal-card">
+        <div class="qr-modal-image-wrapper">
+          <img src="assets/amaes-toolkit-qr.png" alt="Scan QR code to open https://study-tool-amaes.pages.dev/" width="320" height="320" class="qr-modal-img">
+        </div>
+        <div class="qr-modal-content">
+          <h2 id="qr-modal-title">AMAES Toolkit</h2>
+          <p class="qr-modal-url"><code>https://study-tool-amaes.pages.dev/</code></p>
+          <p class="qr-modal-hint">Scan with your phone camera to open instantly on mobile.</p>
+          <div class="qr-modal-actions">
+            <a class="button primary" id="qr-modal-download-btn" href="assets/amaes-toolkit-qr.png" download="amaes-toolkit-qr.png">Download PNG</a>
+            <button class="button outline" id="qr-modal-fullscreen-btn" type="button"><span id="qr-modal-fullscreen-text">Fullscreen</span></button>
+            <button class="button outline" id="qr-modal-dismiss-btn" type="button">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="site.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AMAES Toolkit</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="popup-root">
+      <header class="popup-header">
+        <h1>AMAES Toolkit</h1>
+        <span id="version-badge" class="badge">v0.1.0</span>
+      </header>
+
+      <p class="subtitle">
+        Study companion for AMAES Moodle with automatic updates and shared community answers.
+      </p>
+
+      <div id="announcement-box" class="announcement hidden"></div>
+
+      <nav class="links-grid" aria-label="Toolkit Links">
+        <a id="link-homepage" href="https://study-tool-amaes.pages.dev/" target="_blank" rel="noopener noreferrer">Website</a>
+        <a id="link-database" href="https://github.com/Study-Tool/database" target="_blank" rel="noopener noreferrer">Answer Archive</a>
+        <a id="link-support" href="https://github.com/Study-Tool/amaes/issues" target="_blank" rel="noopener noreferrer">Help &amp; Support</a>
+        <a id="link-repo" href="https://github.com/Study-Tool/amaes" target="_blank" rel="noopener noreferrer">Source Code</a>
+        <a id="link-mirror" href="#" target="_blank" rel="noopener noreferrer" class="hidden">Mirror</a>
+      </nav>
+
+      <footer class="popup-footer">
+        <button id="refresh-config-btn" type="button">Check Updates</button>
+        <span id="status-text" class="status-text">Ready</span>
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

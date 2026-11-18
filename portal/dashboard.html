@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMAES Toolkit - Status &amp; Answer Lookup</title>
+  <meta name="description" content="Live service status, extension version check, and public answer archive lookup for AMAES Toolkit." />
+  <link rel="canonical" href="https://study-tool-amaes.pages.dev/dashboard" />
+  <link rel="icon" type="image/png" href="assets/amaes-toolkit-logo.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            grafana: {
+              bg: '#181b1f',
+              panel: '#22252b',
+              border: '#2c323b',
+              subtext: '#8e9aa8',
+              accent: '#3274d9',
+              green: '#73bf69',
+              amber: '#ff9830',
+              purple: '#b877d9',
+              red: '#f2495c'
+            }
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-grafana-bg text-slate-100 min-h-screen flex items-center justify-center p-4 antialiased font-sans">
+  <main class="w-full max-w-2xl bg-grafana-bg border border-grafana-border rounded-lg shadow-2xl p-4 space-y-4">
+    <header class="flex items-center justify-between border-b border-grafana-border pb-3">
+      <div class="flex items-center space-x-2">
+        <img src="assets/amaes-toolkit-logo.png" alt="" class="w-5 h-5 rounded" />
+        <span class="text-xs font-semibold tracking-wider uppercase text-slate-300">AMAES Toolkit</span>
+        <span id="dashVersionBadge" class="text-[10px] bg-slate-800 text-grafana-subtext px-1.5 py-0.5 rounded font-mono">v0.1.0</span>
+      </div>
+      <nav class="flex items-center space-x-2">
+        <a href="./" class="px-2.5 py-1 text-[11px] font-medium rounded bg-slate-800 text-slate-200 border border-grafana-border hover:border-slate-500">Installer</a>
+        <a id="repoBtn" href="https://github.com/Study-Tool/database" target="_blank" rel="noreferrer" class="px-2.5 py-1 text-[11px] font-medium rounded bg-slate-800 text-slate-200 border border-grafana-border hover:border-slate-500">Answer Archive</a>
+      </nav>
+    </header>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <section class="bg-grafana-panel border border-grafana-border rounded p-3 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-[11px] font-medium text-grafana-subtext uppercase tracking-wider mb-2">
+          <span>Answer Sync Service</span>
+          <span id="relayLatency" class="text-[10px] font-mono text-grafana-subtext">-- ms</span>
+        </div>
+        <div class="flex items-center space-x-3 py-1">
+          <span id="relayDot" class="inline-flex rounded-full h-2.5 w-2.5 bg-grafana-amber"></span>
+          <div>
+            <div id="statusText" class="text-sm font-medium text-white">Checking service...</div>
+            <div class="text-[11px] text-grafana-subtext">Anonymous Sharing · Daily Public Archive Updates</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-grafana-panel border border-grafana-border rounded p-3 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-[11px] font-medium text-grafana-subtext uppercase tracking-wider mb-2">
+          <span>AMAES Toolkit Extension</span>
+          <span class="text-[10px] text-grafana-subtext font-mono">BROWSER</span>
+        </div>
+        <div class="flex items-baseline justify-between py-1">
+          <div>
+            <div class="text-xs text-grafana-subtext">Installed Version</div>
+            <div id="extDetectedText" class="text-lg font-bold font-mono text-white">Not detected</div>
+          </div>
+          <div id="minVerBadge" class="text-[11px] text-grafana-subtext bg-slate-800 border border-grafana-border px-1.5 py-0.5 rounded font-mono">
+            min v0.1.0
+          </div>
+        </div>
+      </section>
+
+      <section class="sm:col-span-2 bg-grafana-panel border border-grafana-border rounded p-3 space-y-2">
+        <div class="flex items-center justify-between text-[11px] font-medium text-grafana-subtext uppercase tracking-wider">
+          <span>Subject Answer Quick Lookup</span>
+          <span id="lookupCount" class="text-[10px] font-mono">Enter a subject code (e.g. CS6204)</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <input id="subjectInput" type="text" placeholder="Subject code (e.g. CS6204, ITE6200)..." class="flex-1 bg-black/40 border border-grafana-border rounded px-2.5 py-1.5 text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-grafana-accent" />
+          <button id="lookupBtn" type="button" class="px-3 py-1.5 text-xs font-medium rounded bg-grafana-accent hover:bg-blue-600 text-white">Search</button>
+        </div>
+        <div id="lookupResults" class="bg-black/30 border border-slate-800 rounded p-2.5 max-h-56 overflow-y-auto font-mono text-[11px] space-y-1.5 text-slate-300">
+          <div class="text-slate-500">Enter a course code above to browse verified answers directly without installing the extension.</div>
+        </div>
+      </section>
+
+      <section class="sm:col-span-2 bg-grafana-panel border border-grafana-border rounded p-3 space-y-2">
+        <div class="flex items-center justify-between text-[11px] font-medium text-grafana-subtext uppercase tracking-wider">
+          <span>Status Log</span>
+          <button id="refreshBtn" type="button" class="text-[10px] font-mono text-blue-400 hover:underline">Re-run Checks</button>
+        </div>
+        <div id="logConsole" class="bg-black/40 border border-slate-800/80 rounded p-2.5 h-28 overflow-y-auto font-mono text-[11px] space-y-1"></div>
+      </section>
+    </div>
+
+    <footer class="flex items-center justify-between text-[10px] text-grafana-subtext pt-2 border-t border-grafana-border/50">
+      <span>AMAES Toolkit · Open Source (MIT)</span>
+      <span class="font-mono">study-tool-amaes.pages.dev</span>
+    </footer>
+  </main>
+
+  <script>
+    const RELAY_URL = 'https://amaes-community-relay.study-tool-amaes-relay.workers.dev';
+    const DB_RAW_BASE = 'https://raw.githubusercontent.com/Study-Tool/database/main/data';
+
+    function appendLog(msg, cls = 'text-slate-300') {
+      const box = document.getElementById('logConsole');
+      const row = document.createElement('div');
+      row.className = cls;
+      row.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      box.appendChild(row);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function runChecks() {
+      const dot = document.getElementById('relayDot');
+      const statusText = document.getElementById('statusText');
+      const latencyEl = document.getElementById('relayLatency');
+      const t0 = performance.now();
+
+      const extVer = document.documentElement.getAttribute('data-amaes-toolkit-version');
+      document.getElementById('extDetectedText').textContent = extVer ? `v${extVer} Active` : 'Not detected';
+
+      try {
+        const res = await fetch(`${RELAY_URL}/v1/config`, { cache: 'no-store' });
+        const ms = Math.round(performance.now() - t0);
+        latencyEl.textContent = `${ms} ms`;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const cfg = await res.json();
+        dot.className = 'inline-flex rounded-full h-2.5 w-2.5 bg-grafana-green';
+        statusText.textContent = 'Service Online';
+        document.getElementById('dashVersionBadge').textContent = `v${cfg.latestVersion || '0.1.0'}`;
+        document.getElementById('minVerBadge').textContent = `min v${cfg.minVersion || '0.1.0'}`;
+        if (cfg.links?.database) document.getElementById('repoBtn').href = cfg.links.database;
+        appendLog(`Service check OK (${ms} ms) — latest v${cfg.latestVersion}`, 'text-grafana-green');
+      } catch (err) {
+        dot.className = 'inline-flex rounded-full h-2.5 w-2.5 bg-grafana-red';
+        statusText.textContent = 'Service Unreachable';
+        appendLog(`Service check failed: ${err.message}`, 'text-grafana-red');
+      }
+    }
+
+    async function fetchSubject() {
+      const raw = document.getElementById('subjectInput').value.trim().toUpperCase();
+      const box = document.getElementById('lookupResults');
+      const countEl = document.getElementById('lookupCount');
+      if (!/^[A-Z0-9_-]{2,16}$/.test(raw)) {
+        countEl.textContent = 'Invalid subject code';
+        return;
+      }
+      box.innerHTML = `<div class="text-slate-400">Loading ${raw}...</div>`;
+      try {
+        const res = await fetch(`${DB_RAW_BASE}/${raw}.json`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Course ${raw} not found (${res.status})`);
+        const data = await res.json();
+        if (data.answerSharingDisabled) {
+          countEl.textContent = 'Restricted';
+          box.innerHTML = `<div class="text-grafana-amber">Answer sharing is disabled for ${raw}.</div>`;
+          return;
+        }
+        const questions = Array.isArray(data.questions) ? data.questions : [];
+        countEl.textContent = `${questions.length} entries (${data.subjectName || raw})`;
+        box.innerHTML = '';
+        questions.slice(0, 50).forEach((q, idx) => {
+          const item = document.createElement('div');
+          item.className = 'border-b border-slate-800/80 pb-1.5';
+          const qText = document.createElement('div');
+          qText.className = 'text-slate-200';
+          qText.textContent = `${idx + 1}. ${q.question || ''}`;
+          const aText = document.createElement('div');
+          aText.className = 'text-grafana-green';
+          aText.textContent = `Answer: ${q.answer || '(elimination only)'}`;
+          item.appendChild(qText);
+          item.appendChild(aText);
+          box.appendChild(item);
+        });
+        appendLog(`Loaded ${questions.length} questions for ${raw}`, 'text-blue-400');
+      } catch (err) {
+        countEl.textContent = 'Lookup error';
+        box.innerHTML = `<div class="text-grafana-red">${err.message}</div>`;
+        appendLog(`Lookup error (${raw}): ${err.message}`, 'text-grafana-red');
+      }
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', runChecks);
+    document.getElementById('lookupBtn').addEventListener('click', fetchSubject);
+    document.getElementById('subjectInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') fetchSubject();
+    });
+    document.addEventListener('amaes-toolkit-detected', runChecks);
+    runChecks();
+  </script>
+</body>
+</html>

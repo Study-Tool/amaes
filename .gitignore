@@ -1,0 +1,5 @@
+extension/node_modules/
+extension/.output/
+extension/.wxt/
+*.log
+.DS_Store

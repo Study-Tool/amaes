@@ -1,0 +1,1870 @@
+        const btnMasterAutoQuiz = document.getElementById('btn-master-auto-quiz');
+        const btnCopyCurrQ = document.getElementById('btn-copy-curr-q');
+        const btnCopyAllQ = document.getElementById('btn-copy-all-q');
+        const btnFillAllPage = document.getElementById('btn-fill-all-page');
+        const chkAutoPick = document.getElementById('chk-auto-pick');
+        const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
+        const chkAutoPickStudyGuideFallback = document.getElementById('chk-auto-pick-study-guide-fallback');
+        const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
+
+        if (btnFillAllPage) {
+            btnFillAllPage.onclick = () => {
+                if (!checkIsQuizAttemptPage()) {
+                    showToast("Open a quiz attempt to fill verified answers!");
+                    return;
+                }
+                const cached = getCachedAnswers(subCode);
+                if (!cached || cached.length === 0) {
+                    showToast("No verified answers found in database for this subject.");
+                    return;
+                }
+                const res = highlightQuizAnswers(cached, true, true);
+                showToast(`Filled ${res.matched || 0} verified answers!`, 2500);
+                setLog(`<b>1-Click Fill:</b> Selected <b>${res.matched || 0}</b> verified answers on page!`, "var(--accent-green)");
+                playToolkitSound('success');
+            };
+        }
+
+        if (btnMasterAutoQuiz) {
+            btnMasterAutoQuiz.onclick = () => {
+                if (checkIsQuizSummaryPage()) {
+                    if (typeof hastenQuizSummaryAutoSubmit === 'function') {
+                        hastenQuizSummaryAutoSubmit();
+                        return;
+                    }
+                    const submitBtn = findQuizSummarySubmitButton();
+                    if (submitBtn) {
+                        submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        submitBtn.focus();
+                        submitBtn.style.outline = '3px solid #10b981';
+                        submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.6)';
+                        showToast("Click 'Submit all and finish' to submit your attempt.", 3000);
+                        return;
+                    }
+                }
+                if (!checkIsQuizAttemptPage()) {
+                    // Student is not on an active attempt page (e.g. view.php, dashboard, course)
+                    const isQuizLanding = window.location.pathname.includes('/mod/quiz/view.php');
+                    if (!autoQuizMode && isQuizLanding) {
+                        const startBtn = document.querySelector('form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], .quizstartbutton button, .quizstartbutton input[type="submit"], #region-main button.btn-primary, #region-main input.btn-primary');
+                        if (startBtn) {
+                            toggleAutoQuizMode(true);
+                            showToast("Starting quiz attempt...", 2000);
+                            setLog("Starting quiz attempt from introduction page...", "var(--accent-green)");
+                            startBtn.click();
+                            return;
+                        }
+                    }
+                    toggleAutoQuizMode();
+                    return;
+                }
+                if (checkIsQuizAttemptPage() && (isWaitingForUserAnswer || document.querySelector('.amaes-blockage-hud'))) {
+                    const currentFocus = userSelectedActiveQuestion || getActiveViewportQuestion();
+                    const nextOnPage = findNextUnansweredOnCurrentPage(currentFocus);
+                    if (nextOnPage) {
+                        setActiveQuestion(nextOnPage, true);
+                        nextOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const qData = extractQuestionData(nextOnPage);
+                        showToast(`Next: Question #${qData ? qData.qNum : ''}`, 1500);
+                        setLog(`Advancing to <b>Question #${qData ? qData.qNum : ''}</b>...`, "var(--accent-blue)");
+                        runAutoQuizSolver(true);
+                        return;
+                    }
+                }
+                toggleAutoQuizMode();
+            };
+        }
+
+        if (chkAutoHlQuiz) {
+            chkAutoHlQuiz.onchange = () => {
+                autoHighlightQuiz = chkAutoHlQuiz.checked;
+                localStorage.setItem('amaes_auto_highlight_quiz', autoHighlightQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_highlight_quiz', autoHighlightQuiz); } catch (_) {}
+                showToast(`Highlight Answers: ${autoHighlightQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Highlight Answers: <b>${autoHighlightQuiz ? 'ON' : 'OFF'}</b>`, autoHighlightQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoHighlightQuiz ? "Visual answer badges enabled on quizzes" : "Badges hidden");
+                if (autoHighlightQuiz && checkIsQuizAttemptPage()) {
+                    const cached = getCachedAnswers(subCode);
+                    if (cached && cached.length > 0) {
+                        highlightQuizAnswers(cached, false, true);
+                    } else if (typeof autoFetchCloudAnswersIfMissing === 'function') {
+                        autoFetchCloudAnswersIfMissing(subCode).then(ok => {
+                            if (ok) highlightQuizAnswers(getCachedAnswers(subCode), false, true);
+                        });
+                    }
+                }
+            };
+        }
+
+        const chkCopyConfidence = document.getElementById('chk-copy-confidence');
+        if (chkCopyConfidence) {
+            chkCopyConfidence.onchange = () => {
+                copyIncludeConfidence = chkCopyConfidence.checked;
+                localStorage.setItem('amaes_copy_include_confidence', copyIncludeConfidence);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_copy_include_confidence', copyIncludeConfidence); } catch (_) {}
+                showToast(`Include DB Hints: ${copyIncludeConfidence ? 'Enabled' : 'Disabled'}`);
+                setLog(`Include DB Hints on Copy: <b>${copyIncludeConfidence ? 'ON' : 'OFF'}</b>`, "var(--accent-blue)", copyIncludeConfidence ? "Prompt will include verified answer hints & confidence" : "Question & choices only");
+            };
+        }
+
+        const chkAutoNext = document.getElementById('chk-auto-next');
+        if (chkAutoNext) {
+            chkAutoNext.onchange = () => {
+                autoNextQuiz = chkAutoNext.checked;
+                localStorage.setItem('amaes_auto_next_quiz', autoNextQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_next_quiz', autoNextQuiz); } catch (_) {}
+                showToast(`Auto-Next (Manual): ${autoNextQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Next Navigation: <b>${autoNextQuiz ? 'ON (Auto-advancing)' : 'OFF (Safe Manual Review)'}</b>`, autoNextQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoNextQuiz ? "Advances automatically on manual choice selection" : "Stay on question until manual Next / N press");
+                if (autoNextQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        const chkSmartSkip = document.getElementById('chk-smart-skip');
+        if (chkSmartSkip) {
+            chkSmartSkip.onchange = () => {
+                smartSkipQuiz = chkSmartSkip.checked;
+                localStorage.setItem('amaes_smart_skip_quiz', smartSkipQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_smart_skip_quiz', smartSkipQuiz); } catch (_) {}
+                showToast(`Smart Skip: ${smartSkipQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Smart Skip Unverified: <b>${smartSkipQuiz ? 'ON (Pause on unverified)' : 'OFF'}</b>`, smartSkipQuiz ? "var(--accent-green)" : "var(--accent-amber)", smartSkipQuiz ? "Pauses auto-next on unverified questions" : "Attempts all matching questions");
+            };
+        }
+
+        const chkShowInQBtns = document.getElementById('chk-show-in-q-btns');
+        if (chkShowInQBtns) {
+            chkShowInQBtns.onchange = (e) => {
+                showInQuestionAiBtns = e.target.checked;
+                localStorage.setItem('amaes_show_in_question_ai_btns', showInQuestionAiBtns);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_show_in_question_ai_btns', showInQuestionAiBtns); } catch (_) {}
+                injectQuestionCopyButtons();
+                showToast(`In-question buttons: ${showInQuestionAiBtns ? 'Shown' : 'Hidden'}`);
+                setLog(`In-Question Action Buttons: <b>${showInQuestionAiBtns ? 'ON' : 'OFF'}</b>`, "var(--accent-blue)", showInQuestionAiBtns ? "Injected beside each question box" : "Buttons hidden");
+            };
+        }
+
+        if (chkAutoPick) {
+            chkAutoPick.onchange = () => {
+                if (autoQuizMode) {
+                    chkAutoPick.checked = true;
+                    return;
+                }
+                autoPickQuiz = chkAutoPick.checked;
+                localStorage.setItem('amaes_auto_pick_quiz', autoPickQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_pick_quiz', autoPickQuiz); } catch (_) {}
+                showToast(`Auto-Pick: ${autoPickQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Pick Answers: <b>${autoPickQuiz ? 'ON (Auto-select verified)' : 'OFF (Companion Mode)'}</b>`, autoPickQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoPickQuiz ? "Will auto-select answers on quiz attempts" : "Highlights only; manual clicks required");
+                if (autoPickQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        if (chkAutoNextVerified) {
+            chkAutoNextVerified.onchange = () => {
+                if (autoQuizMode) {
+                    chkAutoNextVerified.checked = true;
+                    return;
+                }
+                autoNextVerified = chkAutoNextVerified.checked;
+                localStorage.setItem('amaes_auto_next_verified', autoNextVerified);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_next_verified', autoNextVerified); } catch (_) {}
+                showToast(`Auto-Next (Verified): ${autoNextVerified ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Next on Verified Answers: <b>${autoNextVerified ? 'ON' : 'OFF'}</b>`, autoNextVerified ? "var(--accent-green)" : "var(--accent-amber)");
+                if (autoNextVerified && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        if (chkAutoPickStudyGuideFallback) {
+            chkAutoPickStudyGuideFallback.onchange = () => {
+                if (autoQuizMode) {
+                    chkAutoPickStudyGuideFallback.checked = true;
+                    return;
+                }
+                autoPickStudyGuideFallback = chkAutoPickStudyGuideFallback.checked;
+                localStorage.setItem('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback));
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback)); } catch (_) {}
+                showToast(`Study-guide fallback Auto-Pick: ${autoPickStudyGuideFallback ? 'Enabled in Auto-Quiz' : 'Disabled'}`);
+                setLog(`Study-guide fallback Auto-Pick: <b>${autoPickStudyGuideFallback ? 'ON (unverified suggestions)' : 'OFF'}</b>`, autoPickStudyGuideFallback ? 'var(--accent-amber)' : 'var(--text-secondary)', 'Auto-Quiz only; Smart Next controls automatic advancement');
+                if (autoPickStudyGuideFallback && autoQuizMode && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        const chkAutoMinQuiz = document.getElementById('chk-auto-min-quiz');
+        if (chkAutoMinQuiz) {
+            chkAutoMinQuiz.onchange = () => {
+                autoMinimizeQuiz = chkAutoMinQuiz.checked;
+                localStorage.setItem('amaes_auto_min_quiz', autoMinimizeQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_min_quiz', autoMinimizeQuiz); } catch (_) {}
+                showToast(`Auto-minimize during quizzes: ${autoMinimizeQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Minimize During Quizzes: <b>${autoMinimizeQuiz ? 'ON' : 'OFF'}</b>`, autoMinimizeQuiz ? "var(--accent-cyan)" : "var(--accent-amber)", autoMinimizeQuiz ? "Minimizes panel upon entering quiz" : "Panel remains open");
+            };
+        }
+
+        const chkAutoSubmitQuiz = document.getElementById('chk-auto-submit-quiz');
+        if (chkAutoSubmitQuiz) {
+            chkAutoSubmitQuiz.onchange = () => {
+                autoSubmitQuiz = chkAutoSubmitQuiz.checked;
+                localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_submit_quiz', autoSubmitQuiz); } catch (_) {}
+                showToast(`Auto-Submit on Summary: ${autoSubmitQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Submit on Summary Review: <b>${autoSubmitQuiz ? 'ON' : 'OFF'}</b>`, autoSubmitQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoSubmitQuiz ? "Auto-submits from summary page & plays completion chime" : "Safe manual submission");
+            };
+        }
+
+        const chkAdaptiveProbe = document.getElementById('chk-adaptive-probe');
+        if (chkAdaptiveProbe) {
+            chkAdaptiveProbe.onchange = () => {
+                adaptiveProbeQuiz = chkAdaptiveProbe.checked;
+                localStorage.setItem('amaes_adaptive_probe_quiz', adaptiveProbeQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_adaptive_probe_quiz', adaptiveProbeQuiz); } catch (_) {}
+                showToast(`Adaptive Probe: ${adaptiveProbeQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Adaptive Probe (Unreviewed Quizzes): <b>${adaptiveProbeQuiz ? 'ON (Rotating unverified choices)' : 'OFF'}</b>`, adaptiveProbeQuiz ? "var(--accent-purple)" : "var(--accent-amber)", adaptiveProbeQuiz ? "Rotates unverified choices across attempts to find 100%" : "Repeats static choices on re-attempts");
+                if (adaptiveProbeQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        const selAdaptiveProbeBudget = document.getElementById('sel-adaptive-probe-budget');
+        if (selAdaptiveProbeBudget) {
+            selAdaptiveProbeBudget.onchange = () => {
+                adaptiveProbeBudget = parseInt(selAdaptiveProbeBudget.value, 10) || 2;
+                localStorage.setItem('amaes_adaptive_probe_budget', adaptiveProbeBudget);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_adaptive_probe_budget', adaptiveProbeBudget); } catch (_) {}
+                showToast(`Probe Budget: ${adaptiveProbeBudget} questions/attempt`);
+                setLog(`Probe Budget: <b>${adaptiveProbeBudget}</b> unverified questions rotated per attempt`, "var(--accent-purple)");
+            };
+        }
+
+        const selAutoSubmitDelay = document.getElementById('sel-auto-submit-delay');
+        if (selAutoSubmitDelay) {
+            selAutoSubmitDelay.onchange = () => {
+                autoSubmitDelay = parseInt(selAutoSubmitDelay.value, 10);
+                if (isNaN(autoSubmitDelay) || autoSubmitDelay < 0) autoSubmitDelay = 10;
+                localStorage.setItem('amaes_auto_submit_delay', autoSubmitDelay);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_submit_delay', autoSubmitDelay); } catch (_) {}
+                showToast(`Auto-Submit Leeway: ${autoSubmitDelay === 0 ? 'Instant' : autoSubmitDelay + 's'}`);
+                setLog(`Auto-Submit Leeway: <b>${autoSubmitDelay === 0 ? 'Instant' : autoSubmitDelay + 's'}</b> before auto-submitting on summary page`, "var(--accent-green)");
+            };
+        }
+
+        const chkKeyboardShortcuts = document.getElementById('chk-keyboard-shortcuts');
+        if (chkKeyboardShortcuts) {
+            chkKeyboardShortcuts.onchange = () => {
+                enableKeyboardShortcuts = chkKeyboardShortcuts.checked;
+                localStorage.setItem('amaes_enable_hotkeys', enableKeyboardShortcuts);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_enable_hotkeys', enableKeyboardShortcuts); } catch (_) {}
+                showToast(`Keyboard Navigation: ${enableKeyboardShortcuts ? 'Enabled' : 'Disabled'}`);
+                setLog(`Keyboard Navigation: <b>${enableKeyboardShortcuts ? 'ON' : 'OFF'}</b>`, enableKeyboardShortcuts ? "var(--accent-blue)" : "var(--accent-amber)", enableKeyboardShortcuts ? "N, Space, [ ], 1-4, C, P, H active" : "Key navigation disabled");
+            };
+        }
+
+        const chkSkipPassedQuizzes = document.getElementById('chk-skip-passed-quizzes');
+        if (chkSkipPassedQuizzes) {
+            chkSkipPassedQuizzes.onchange = () => {
+                const isSkip = chkSkipPassedQuizzes.checked;
+                localStorage.setItem('amaes_skip_passed_quizzes', isSkip ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_skip_passed_quizzes', isSkip ? 'true' : 'false'); } catch (_) {}
+                showToast(`Skip Passed Quizzes: ${isSkip ? 'Enabled (≥80%)' : 'Disabled (Cycle all)'}`);
+                setLog(`Quiz Cycling: <b>${isSkip ? 'Skip Passed (≥80%)' : 'All Quizzes'}</b>`, isSkip ? "var(--accent-blue)" : "var(--text-secondary)", isSkip ? "Keyboard cycling [ and ] jumps over completed/passing quizzes" : "Keyboard cycling advances to every quiz in sequence");
+                if (typeof injectQuizBottomNavigation === 'function') {
+                    injectQuizBottomNavigation();
+                }
+            };
+        }
+
+        const chkAutoCloseCourseIndex = document.getElementById('chk-auto-close-course-index');
+        if (chkAutoCloseCourseIndex) {
+            chkAutoCloseCourseIndex.onchange = () => {
+                const isAuto = chkAutoCloseCourseIndex.checked;
+                localStorage.setItem('amaes_auto_close_course_index', isAuto ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_close_course_index', isAuto ? 'true' : 'false'); } catch (_) {}
+                showToast(`Auto-Close Course Index: ${isAuto ? 'Enabled' : 'Disabled'}`);
+                setLog(`Course Index Drawer: <b>${isAuto ? 'Auto-Close ON' : 'Keep Open'}</b>`, isAuto ? "var(--accent-blue)" : "var(--text-secondary)", isAuto ? "Course index drawer automatically closes on course pages" : "Course index drawer remains in default state");
+                if (isAuto && typeof autoCloseCourseIndexDrawer === 'function') {
+                    autoCloseCourseIndexDrawer();
+                }
+            };
+        }
+
+        const chkAutoMarkDone100 = document.getElementById('chk-auto-mark-done-100');
+        if (chkAutoMarkDone100) {
+            chkAutoMarkDone100.onchange = () => {
+                autoMarkDoneOn100 = chkAutoMarkDone100.checked;
+                localStorage.setItem('amaes_auto_mark_done_100', autoMarkDoneOn100 ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_mark_done_100', autoMarkDoneOn100 ? 'true' : 'false'); } catch (_) {}
+                showToast(`Auto-Mark 100% Done: ${autoMarkDoneOn100 ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Mark Done on 100%: <b>${autoMarkDoneOn100 ? 'ON' : 'OFF'}</b>`, autoMarkDoneOn100 ? "var(--accent-green)" : "var(--accent-amber)", autoMarkDoneOn100 ? "Automatically marks Moodle activity as Done upon achieving a 100% quiz score" : "Requires manual activity completion click");
+            };
+        }
+
+        const chkAudioAlerts = document.getElementById('chk-audio-alerts');
+        if (chkAudioAlerts) {
+            chkAudioAlerts.onchange = () => {
+                enableAudioAlerts = chkAudioAlerts.checked;
+                localStorage.setItem('amaes_enable_audio_alerts', enableAudioAlerts ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_enable_audio_alerts', enableAudioAlerts ? 'true' : 'false'); } catch (_) {}
+                showToast(`Audio Notifications: ${enableAudioAlerts ? 'Enabled' : 'Disabled'}`);
+                setLog(`Audio Notifications: <b>${enableAudioAlerts ? 'ON' : 'OFF'}</b>`, enableAudioAlerts ? "var(--accent-green)" : "var(--accent-amber)");
+                if (enableAudioAlerts) {
+                    playToolkitSound('quest_done');
+                }
+            };
+        }
+
+        const chkAiQuizEnabled = document.getElementById('chk-ai-quiz-enabled');
+        if (chkAiQuizEnabled) {
+            chkAiQuizEnabled.onchange = () => {
+                aiQuizEnabled = chkAiQuizEnabled.checked;
+                localStorage.setItem('amaes_ai_quiz_enabled', aiQuizEnabled);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_ai_quiz_enabled', aiQuizEnabled); } catch (_) {}
+                showToast(`AI Quiz Solver: ${aiQuizEnabled ? 'Enabled' : 'Disabled'}`);
+                setLog(`Gemini AI Quiz Solver: <b>${aiQuizEnabled ? 'ON' : 'OFF'}</b>`, aiQuizEnabled ? "var(--accent-purple)" : "var(--accent-amber)");
+            };
+        }
+
+        const chkAiAutoSelect = document.getElementById('chk-ai-auto-select');
+        if (chkAiAutoSelect) {
+            chkAiAutoSelect.onchange = () => {
+                aiAutoSelect = chkAiAutoSelect.checked;
+                localStorage.setItem('amaes_ai_auto_select', aiAutoSelect);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_ai_auto_select', aiAutoSelect); } catch (_) {}
+                showToast(`AI Auto-Select: ${aiAutoSelect ? 'Auto-Select ON' : 'Highlight Only'}`);
+                setLog(`AI Auto-Select Answers: <b>${aiAutoSelect ? 'ON (Auto-select AI answers)' : 'OFF (Highlight only)'}</b>`, aiAutoSelect ? "var(--accent-purple)" : "var(--accent-amber)");
+            };
+        }
+
+        const selAiRetryCount = document.getElementById('sel-ai-retry-count');
+        if (selAiRetryCount) {
+            selAiRetryCount.onchange = () => {
+                setAiRetryCount(selAiRetryCount.value);
+                const courseSel = document.getElementById('sel-course-ai-retry-count');
+                if (courseSel) courseSel.value = String(getAiRetryCount());
+                showToast(`AI Retry Attempts set to ${getAiRetryCount()}`);
+            };
+        }
+
+        const selCourseAiRetryCount = document.getElementById('sel-course-ai-retry-count');
+        if (selCourseAiRetryCount) {
+            selCourseAiRetryCount.onchange = () => {
+                setAiRetryCount(selCourseAiRetryCount.value);
+                const quizSel = document.getElementById('sel-ai-retry-count');
+                if (quizSel) quizSel.value = String(getAiRetryCount());
+                showToast(`AI Retry Attempts set to ${getAiRetryCount()}`);
+            };
+        }
+
+        const selAiPlanTier = document.getElementById('sel-ai-plan-tier');
+        if (selAiPlanTier) {
+            selAiPlanTier.onchange = () => {
+                setAiPlanTier(selAiPlanTier.value);
+                const courseSel = document.getElementById('sel-course-ai-plan-tier');
+                if (courseSel) courseSel.value = getAiPlanTier();
+                showToast(`AI plan set to ${getAiPlanTier() === 'free' ? 'Free plan' : 'Paid plan'}`);
+            };
+        }
+
+        const selCourseAiPlanTier = document.getElementById('sel-course-ai-plan-tier');
+        if (selCourseAiPlanTier) {
+            selCourseAiPlanTier.onchange = () => {
+                setAiPlanTier(selCourseAiPlanTier.value);
+                const quizSel = document.getElementById('sel-ai-plan-tier');
+                if (quizSel) quizSel.value = getAiPlanTier();
+                showToast(`AI plan set to ${getAiPlanTier() === 'free' ? 'Free plan' : 'Paid plan'}`);
+            };
+        }
+
+        const chkAiAutoCopyOnFail = document.getElementById('chk-ai-auto-copy-on-fail');
+        if (chkAiAutoCopyOnFail) {
+            chkAiAutoCopyOnFail.onchange = () => {
+                setAiAutoCopyOnFail(chkAiAutoCopyOnFail.checked);
+                const courseChk = document.getElementById('chk-course-ai-auto-copy-on-fail');
+                if (courseChk) courseChk.checked = getAiAutoCopyOnFail();
+                showToast(`Auto-Copy on AI Failure: ${getAiAutoCopyOnFail() ? 'ON' : 'OFF'}`);
+            };
+        }
+
+        const chkCourseAiAutoCopyOnFail = document.getElementById('chk-course-ai-auto-copy-on-fail');
+        if (chkCourseAiAutoCopyOnFail) {
+            chkCourseAiAutoCopyOnFail.onchange = () => {
+                setAiAutoCopyOnFail(chkCourseAiAutoCopyOnFail.checked);
+                const quizChk = document.getElementById('chk-ai-auto-copy-on-fail');
+                if (quizChk) quizChk.checked = getAiAutoCopyOnFail();
+                showToast(`Auto-Copy on AI Failure: ${getAiAutoCopyOnFail() ? 'ON' : 'OFF'}`);
+            };
+        }
+
+        if (btnCopyCurrQ) {
+            btnCopyCurrQ.onclick = async () => {
+                const que = getActiveViewportQuestion();
+                if (!que) {
+                    showToast("No quiz questions found on this page! Enter a quiz attempt first.", 3500);
+                    setLog("<b>No questions found</b> on this page. Open a quiz attempt first.", "var(--accent-pink)");
+                    return;
+                }
+                const qData = extractQuestionData(que);
+                const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
+                const text = formatQuestionForAI(que, aiPromptHint);
+                try {
+                    await copyToClipboard(text);
+                    btnCopyCurrQ.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    const qLabel = qData && qData.qNum ? `Question #${qData.qNum}` : 'Question';
+                    showToast(willIncludeContext ? `${qLabel} copied with Course AI Context!` : `${qLabel} & choices copied!`);
+                    setLog(willIncludeContext ? `Copied <b>${qLabel}</b> with Course AI Context!` : `Copied <b>${qLabel}</b> & choices!`, "var(--accent-green)");
+                    setTimeout(() => {
+                        btnCopyCurrQ.innerHTML = `${ICONS.copy} <span>Copy Question (C)</span>`;
+                    }, 1800);
+                } catch (err) {
+                    showToast("Failed to copy question to clipboard.");
+                    setLog("Failed to copy to clipboard.", "var(--accent-pink)");
+                }
+            };
+        }
+
+        const btnPasteAiAns = document.getElementById('btn-paste-ai-ans');
+        if (btnPasteAiAns) {
+            btnPasteAiAns.onclick = () => {
+                autoSelectFromAiClipboard();
+            };
+        }
+
+        if (btnCopyAllQ) {
+            btnCopyAllQ.onclick = async () => {
+                const queList = document.querySelectorAll('.que');
+                if (queList.length === 0) {
+                    showToast("No quiz questions found on this page! Enter a quiz attempt first.", 3500);
+                    setLog("<b>No questions found</b> on this page. Open a quiz attempt first.", "var(--accent-pink)");
+                    return;
+                }
+                const text = formatAllQuestionsForAI(aiPromptHint);
+                try {
+                    await copyToClipboard(text);
+                    btnCopyAllQ.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    showToast(`All ${queList.length} questions copied for AI!`);
+                    setLog(`Copied all <b>${queList.length}</b> questions for AI!`, "var(--accent-green)");
+                    setTimeout(() => {
+                        btnCopyAllQ.innerHTML = `${ICONS.copy} <span>Copy All</span>`;
+                    }, 1800);
+                } catch (err) {
+                    showToast("Failed to copy questions to clipboard.");
+                    setLog("Failed to copy to clipboard.", "var(--accent-pink)");
+                }
+            };
+        }
+
+        // --- MODULE 1: Web Scraper Answers & Controls ---
+        const btnCopyAmauoedLink = document.getElementById('btn-copy-amauoed-link');
+        const urlMatchBadge = document.getElementById('amauoed-url-match-badge');
+        const hlAnswersBtn = document.getElementById('btn-hl-answers');
+        const selectAnswersBtn = document.getElementById('btn-select-answers');
+
+        async function updateAmauoedDisplay(targetCode) {
+            const code = targetCode || subCode;
+            const linkDisplay = document.getElementById('amauoed-link-display');
+            const copyBtn = document.getElementById('btn-copy-amauoed-link');
+            if (!linkDisplay) return;
+
+            let url = getStoredAmauoedUrl(code);
+            if (url) {
+                renderLink(url);
+            } else if (code && code !== 'GENERAL' && code !== 'DEFAULT' && autoScrapeAmauoed) {
+                linkDisplay.textContent = 'Auto-detecting link...';
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (urlMatchBadge) urlMatchBadge.style.display = 'none';
+                try {
+                    url = await autoFindAmauoedLink(code, courseInfo.subjectName || courseInfo.currentActivityTitle || '');
+                    if (url) {
+                        renderLink(url);
+                        const existing = getCachedAnswers(code);
+                        if ((!existing || existing.length === 0) && autoScrapeAmauoed) {
+                            setLog(`Auto-scraping AMAUOED answers for <b>${code}</b>...`, 'var(--accent-blue)');
+                            const scraped = await loadAllAmauoedAnswers(url);
+                            if (scraped && scraped.length > 0) {
+                                mergeAnswersIntoCache(code, scraped, 'AMAUOED');
+                                updateTermCoverageUI(code);
+                                setLog(`Auto-scraped <b>${scraped.length}</b> answers from AMAUOED for <b>${code}</b>!`, 'var(--accent-green)');
+                                if (checkIsQuizPage()) {
+                                    highlightQuizAnswers(getCachedAnswers(code), false);
+                                }
+                            }
+                        }
+                    } else {
+                        linkDisplay.textContent = 'No study guide link detected';
+                        linkDisplay.removeAttribute('href');
+                        if (copyBtn) copyBtn.disabled = true;
+                        if (urlMatchBadge) urlMatchBadge.style.display = 'none';
+                    }
+                } catch (e) {
+                    linkDisplay.textContent = 'No study guide link detected';
+                    linkDisplay.removeAttribute('href');
+                    if (copyBtn) copyBtn.disabled = true;
+                    if (urlMatchBadge) urlMatchBadge.style.display = 'none';
+                }
+            } else {
+                linkDisplay.textContent = 'No study guide link detected';
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (urlMatchBadge) urlMatchBadge.style.display = 'none';
+            }
+
+            function renderLink(linkUrl) {
+                linkDisplay.textContent = linkUrl;
+                linkDisplay.href = linkUrl;
+                linkDisplay.title = linkUrl;
+                if (copyBtn) copyBtn.disabled = false;
+                if (urlMatchBadge) {
+                    const activeCourseContext = { ...courseInfo, subjectCode: code || subCode || (courseInfo && courseInfo.subjectCode) };
+                    const res = checkUrlCourseMatch(linkUrl, activeCourseContext);
+                    const isInCourse = (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ||
+                                       (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ||
+                                       Boolean(courseInfo && courseInfo.subjectCode && !document.getElementById('amaes-select-active-course'));
+
+                    if (res.status === 'match') {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
+                        urlMatchBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+                        urlMatchBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                        urlMatchBadge.style.color = 'var(--accent-green)';
+                    } else if (res.status === 'mismatch' && isInCourse) {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
+                        urlMatchBadge.style.background = 'rgba(244, 63, 94, 0.12)';
+                        urlMatchBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+                        urlMatchBadge.style.color = 'var(--accent-pink)';
+
+                        const fixBtn = document.getElementById('btn-fix-amauoed-url');
+                        if (fixBtn) {
+                            fixBtn.onclick = (e) => {
+                                e.preventDefault();
+                                const correctUrl = getStoredAmauoedUrl(subCode);
+                                if (correctUrl) {
+                                    setStoredAmauoedUrl(subCode, correctUrl);
+                                    renderLink(correctUrl);
+                                    setLog(`Switched to detected <b>${subCode}</b> URL!`, 'var(--accent-green)');
+                                }
+                            };
+                        }
+                    } else if (res.status === 'invalid' && isInCourse) {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
+                        urlMatchBadge.style.background = 'rgba(244, 63, 94, 0.12)';
+                        urlMatchBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+                        urlMatchBadge.style.color = 'var(--accent-pink)';
+                    } else {
+                        urlMatchBadge.style.display = 'none';
+                    }
+                }
+            }
+
+            updateJennysonlineDisplay(code);
+        }
+
+        async function updateJennysonlineDisplay(targetCode) {
+            const code = targetCode || subCode;
+            const linkDisplay = document.getElementById('jennysonline-link-display');
+            const copyBtn = document.getElementById('btn-copy-jennysonline-link');
+            const badge = document.getElementById('jennysonline-match-badge');
+            const statusPill = document.getElementById('jennysonline-status-pill');
+            if (!linkDisplay) return;
+
+            if (!code || code === 'GENERAL' || code === 'DEFAULT') {
+                linkDisplay.textContent = 'No course selected';
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (badge) badge.style.display = 'none';
+                if (statusPill) statusPill.textContent = '';
+                return;
+            }
+
+            let cached = typeof readJennysonlinePersistentCache === 'function' ? readJennysonlinePersistentCache(code) : null;
+            let url = '';
+            let count = 0;
+            if (Array.isArray(cached) && cached.length > 0) {
+                count = cached.length;
+                url = cached[0].sourceUrl || (typeof CLOUD_DB_JENNYSONLINE_URL !== 'undefined' ? `${CLOUD_DB_JENNYSONLINE_URL}${code}.json` : '');
+            }
+
+            if (!url && typeof loadJennysonlineAnswersForCourse === 'function' && autoScrapeAmauoed) {
+                linkDisplay.textContent = "Checking Jenny's Online...";
+                try {
+                    const answers = await loadJennysonlineAnswersForCourse(code);
+                    if (Array.isArray(answers) && answers.length > 0) {
+                        count = answers.length;
+                        url = answers[0].sourceUrl || (typeof CLOUD_DB_JENNYSONLINE_URL !== 'undefined' ? `${CLOUD_DB_JENNYSONLINE_URL}${code}.json` : '');
+                    }
+                } catch (_) {}
+            }
+
+            if (url) {
+                linkDisplay.textContent = url;
+                linkDisplay.href = url;
+                linkDisplay.title = url;
+                if (copyBtn) copyBtn.disabled = false;
+                if (badge) {
+                    badge.style.display = 'block';
+                    badge.style.background = 'rgba(168, 85, 247, 0.12)';
+                    badge.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+                    badge.style.color = 'var(--accent-purple, #c084fc)';
+                    badge.innerHTML = `<span style="font-weight:600;">Jenny's Online: <b>${count}</b> unconfirmed study guide candidates available</span>`;
+                }
+                if (statusPill) statusPill.textContent = `${count} Qs`;
+            } else {
+                linkDisplay.textContent = `No Jenny's Online guide available for ${code}`;
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (badge) badge.style.display = 'none';
+                if (statusPill) statusPill.textContent = 'Not in snapshot';
+            }
+        }
+
+        function updateTermCoverageUI(code) {
+            const cardEl = document.getElementById('amaes-term-coverage-card');
+            const targetCode = code !== undefined ? code : (courseInfo.subjectCode || '');
+            if (!targetCode) {
+                if (cardEl) cardEl.style.display = 'none';
+                return;
+            }
+            if (cardEl) cardEl.style.display = 'flex';
+
+            const summaryEl = document.getElementById('amaes-term-summary');
+            const pillsEl = document.getElementById('amaes-term-pills');
+            const titleEl = document.getElementById('amaes-coverage-title');
+            const badgeEl = document.getElementById('amaes-coverage-badge');
+            if (titleEl) titleEl.innerText = `Course Coverage (${targetCode}):`;
+            if (badgeEl) badgeEl.innerText = targetCode;
+            if (!pillsEl || !summaryEl) return;
+
+            const questions = getCachedAnswers(targetCode) || [];
+            const total = questions.length;
+
+            let verifiedCount = 0;
+            let communityCount = 0;
+            let amauoedCount = 0;
+            let eliminatedCount = 0;
+
+            questions.forEach(q => {
+                const s = (q.source || '').toLowerCase();
+                const sources = Array.isArray(q.sources) ? q.sources.map(x => (x || '').toLowerCase()) : [];
+                const isStudyGuide = s.includes('amauoed') || s.includes('jennysonline') || sources.some(x => x.includes('amauoed') || x.includes('jennysonline'));
+
+                if (isStudyGuide) {
+                    amauoedCount++;
+                } else {
+                    verifiedCount++;
+                }
+
+                if (Array.isArray(q.wrongAnswers)) {
+                    eliminatedCount += q.wrongAnswers.length;
+                }
+            });
+
+            const statVer = document.getElementById('amaes-stat-verified');
+            const statComm = document.getElementById('amaes-stat-community');
+            const statAmau = document.getElementById('amaes-stat-amauoed');
+            const statElim = document.getElementById('amaes-stat-eliminated');
+            if (statVer) statVer.innerText = String(verifiedCount);
+            if (statComm) statComm.innerText = '0';
+            if (statAmau) statAmau.innerText = String(amauoedCount);
+            if (statElim) statElim.innerText = String(eliminatedCount);
+
+            const stats = getSubjectTermBreakdown(targetCode);
+            if (total === 0) {
+                summaryEl.innerText = "No Qs Saved";
+                summaryEl.style.color = "rgba(255, 255, 255, 0.45)";
+            } else {
+                const covered = [stats.prelim > 0, stats.midterm > 0, stats.prefi > 0, stats.final > 0].filter(Boolean).length;
+                summaryEl.innerText = `${total} Qs Total • ${covered}/4 Terms Ready`;
+                summaryEl.style.color = covered === 4 ? "#34d399" : covered > 0 ? "#60a5fa" : "rgba(255, 255, 255, 0.7)";
+            }
+
+            const terms = [
+                { name: 'Prelim', count: stats.prelim },
+                { name: 'Midterm', count: stats.midterm },
+                { name: 'Prefi', count: stats.prefi },
+                { name: 'Final', count: stats.final }
+            ];
+
+            pillsEl.innerHTML = terms.map(t => {
+                if (t.count > 0) {
+                    return `
+                        <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid #10b981; border-radius: 4px; padding: 3px 2px; text-align: center;" title="${t.name}: ${t.count} verified questions available">
+                            <div style="font-size: 8.5px; font-weight: 700; color: #10b981;">${t.name}</div>
+                            <div style="font-size: 10px; font-weight: 800; color: #34d399;">${t.count} Qs</div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(255, 255, 255, 0.22); border-radius: 4px; padding: 3px 2px; text-align: center;" title="${t.name}: No questions stored yet">
+                            <div style="font-size: 8.5px; font-weight: 600; color: rgba(255, 255, 255, 0.7);">${t.name}</div>
+                            <div style="font-size: 9.5px; font-weight: 700; color: rgba(255, 255, 255, 0.45);">${t.count} Qs</div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        updateAmauoedDisplay(courseInfo.subjectCode ? subCode : '');
+        updateTermCoverageUI(courseInfo.subjectCode ? subCode : '');
+
+        const selectActiveCourse = document.getElementById('amaes-select-active-course');
+        if (selectActiveCourse) {
+            selectActiveCourse.onchange = () => {
+                let val = selectActiveCourse.value;
+                if (val === '_custom') {
+                    const custom = prompt("Enter Subject Code (e.g. CS6301, ITE6301):", "");
+                    if (custom && custom.trim()) {
+                        val = custom.trim().toUpperCase();
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = `${val} (0 Qs)`;
+                        opt.selected = true;
+                        selectActiveCourse.insertBefore(opt, selectActiveCourse.lastElementChild);
+                    } else {
+                        selectActiveCourse.value = subCode;
+                        return;
+                    }
+                }
+                subCode = val;
+                updateAmauoedDisplay(subCode);
+                updateTermCoverageUI(subCode);
+                const curAnswers = getCachedAnswers(subCode);
+                setLog(`Active subject switched to <b>${subCode}</b> (${(curAnswers || []).length} cached answers).`, "var(--accent-blue)");
+            };
+        }
+
+        if (btnCopyAmauoedLink) {
+            btnCopyAmauoedLink.onclick = async () => {
+                const linkDisplay = document.getElementById('amauoed-link-display');
+                const url = (linkDisplay && linkDisplay.getAttribute('href') && linkDisplay.getAttribute('href') !== '#')
+                    ? linkDisplay.getAttribute('href')
+                    : (getStoredAmauoedUrl(subCode) || '');
+                if (!url) {
+                    showToast("No study guide link to copy!");
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(url);
+                    btnCopyAmauoedLink.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    showToast("Study guide link copied to clipboard!");
+                    setLog(`Copied study guide link to clipboard: <b>${url}</b>`, "var(--accent-green)");
+                    setTimeout(() => {
+                        btnCopyAmauoedLink.innerHTML = `${ICONS.copy} <span>Copy Link</span>`;
+                    }, 1800);
+                } catch (err) {
+                    showToast("Failed to copy link to clipboard.");
+                }
+            };
+        }
+
+        const btnCopyJennysonlineLink = document.getElementById('btn-copy-jennysonline-link');
+        if (btnCopyJennysonlineLink) {
+            btnCopyJennysonlineLink.onclick = async () => {
+                const linkDisplay = document.getElementById('jennysonline-link-display');
+                const url = (linkDisplay && linkDisplay.getAttribute('href') && linkDisplay.getAttribute('href') !== '#')
+                    ? linkDisplay.getAttribute('href')
+                    : '';
+                if (!url) {
+                    showToast("No Jenny's Online link to copy!");
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(url);
+                    btnCopyJennysonlineLink.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    showToast("Jenny's Online link copied to clipboard!");
+                    setLog(`Copied Jenny's Online link to clipboard: <b>${url}</b>`, "var(--accent-green)");
+                    setTimeout(() => {
+                        btnCopyJennysonlineLink.innerHTML = `${ICONS.copy} <span>Copy Link</span>`;
+                    }, 1800);
+                } catch (err) {
+                    showToast("Failed to copy link to clipboard.");
+                }
+            };
+        }
+
+        setupPersistentAccordion('mod-quiz-header', 'mod-quiz-body', 'mod-quiz-arrow', 'amaes_pref_mod_amauoed', true);
+
+        if (chkAutoHlQuiz) chkAutoHlQuiz.onchange = () => {
+            autoHighlightQuiz = chkAutoHlQuiz.checked;
+            localStorage.setItem('amaes_auto_highlight_quiz', autoHighlightQuiz);
+        };
+
+        // Highlight Button
+        if (hlAnswersBtn) hlAnswersBtn.onclick = () => {
+            const cached = getCachedAnswers(subCode);
+            const isExamSite = typeof isExamPortalDomain === 'function' && isExamPortalDomain();
+            const term = isExamSite ? 'exam' : 'quiz';
+            if (!cached) {
+                setLog(`No answers cached yet for this ${term}!`, "var(--accent-pink)");
+                return;
+            }
+            const res = highlightQuizAnswers(cached, false);
+            if (res.error) {
+                setLog(res.error, "var(--accent-pink)");
+            } else if (res.matched === res.total && res.total > 0) {
+                setLog(`Highlighted all <b>${res.total}</b> answers!`, "var(--accent-green)");
+            } else if (res.matched === 0 && res.total > 0) {
+                setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
+            } else {
+                setLog(`Highlighted <b>${res.matched}/${res.total}</b> answers. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
+            }
+        };
+
+        // Auto-Select Button
+        if (selectAnswersBtn) selectAnswersBtn.onclick = () => {
+            const cached = getCachedAnswers(subCode);
+            const isExamSite = typeof isExamPortalDomain === 'function' && isExamPortalDomain();
+            const term = isExamSite ? 'exam' : 'quiz';
+            if (!cached) {
+                setLog(`No answers cached yet for this ${term}!`, "var(--accent-pink)");
+                return;
+            }
+            const res = highlightQuizAnswers(cached, true, true);
+            if (res.error) {
+                setLog(res.error, "var(--accent-pink)");
+            } else if (res.matched === res.total && res.total > 0) {
+                setLog(`Auto-selected all <b>${res.total}</b> answers!`, "var(--accent-green)");
+            } else if (res.matched === 0 && res.total > 0) {
+                setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
+            } else {
+                setLog(`Auto-selected <b>${res.matched}/${res.total}</b> answers. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
+            }
+        };
+
+
+
+        // Cloud Database Sync Handlers
+        const btnCloudSync = document.getElementById('btn-cloud-sync');
+        const btnConfigCloud = document.getElementById('btn-config-cloud');
+
+        if (btnCloudSync) {
+            btnCloudSync.onclick = async () => {
+                btnCloudSync.disabled = true;
+                btnCloudSync.classList.add('amaes-pulse');
+                btnCloudSync.innerHTML = `${ICONS.cloud} <span>Connecting...</span>`;
+                showToast("Connecting to Cloud Database...", 2000);
+                setLog("Starting Cloud Sync...", "var(--accent-blue)", "Connecting to Community Cloud");
+
+                let targetCode = subCode;
+                const dashCourses = detectDashboardCourses();
+
+                // Dashboard batch sync if no specific course is selected
+                if ((!targetCode || targetCode === 'DEFAULT' || targetCode === 'GENERAL') && dashCourses.length > 0) {
+                    btnCloudSync.innerHTML = `${ICONS.cloud} <span>Syncing ${dashCourses.length} Courses...</span>`;
+                    showToast(`Syncing community & AMAUOED databases for ${dashCourses.length} courses...`, 3000);
+                    setLog(`Syncing Cloud & AMAUOED databases for <b>${dashCourses.length} courses</b>...`, "var(--accent-blue)", "Connecting to Community Cloud and amauoed.com");
+
+                    let totalSynced = 0;
+                    let coursesProcessed = 0;
+
+                    for (let i = 0; i < dashCourses.length; i++) {
+                        const c = dashCourses[i];
+                        btnCloudSync.innerHTML = `${ICONS.cloud} <span>[${i + 1}/${dashCourses.length}] ${c.code}...</span>`;
+                        setLog(`[${i + 1}/${dashCourses.length}] Syncing <b>${c.code}</b> from Cloud Hub...`, "var(--accent-cyan)", `Checking database for ${c.code}`);
+
+                        try {
+                            let res = null;
+                            try {
+                                res = await syncAnswersFromCloud(c.code, null, c.title || '');
+                            } catch (e) {
+                                res = null;
+                            }
+
+                            if (res && res.count > 0) {
+                                totalSynced += res.count;
+                                coursesProcessed++;
+                            } else {
+                                const amauoedLink = await autoFindAmauoedLink(c.code, c.title || '');
+                                if (amauoedLink) {
+                                    setLog(`[${i + 1}/${dashCourses.length}] Scraping AMAUOED for <b>${c.code}</b>...`, "var(--accent-purple)", `Crawling questions from ${amauoedLink}`);
+                                    const scraped = await loadAllAmauoedAnswers(amauoedLink);
+                                    if (scraped && scraped.length > 0) {
+                                        mergeAnswersIntoCache(c.code, scraped, 'AMAUOED');
+                                        totalSynced += scraped.length;
+                                        coursesProcessed++;
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            logDebug(`Cloud sync error for ${c.code}: ${err.message}`);
+                        }
+                    }
+
+                    showToast(`Cloud Sync Complete! Found ${totalSynced} answer entries and study-guide suggestions across ${dashCourses.length} courses.`, 4000);
+                    setLog(`Cloud Sync Complete! Found <b>${totalSynced}</b> answer entries and study-guide suggestions across ${dashCourses.length} courses.`, "var(--accent-green)", "Guide suggestions remain unconfirmed and session-only");
+                    btnCloudSync.classList.remove('amaes-pulse');
+                    btnCloudSync.innerHTML = `${ICONS.check} <span>Synced ${totalSynced} Qs!</span>`;
+                    injectDashboardCourseBadges();
+                    setTimeout(() => {
+                        btnCloudSync.disabled = false;
+                        btnCloudSync.innerHTML = `${ICONS.cloudDownload} <span>Cloud Sync</span>`;
+                    }, 3500);
+                    return;
+                }
+
+                if (!targetCode || targetCode === 'DEFAULT' || targetCode === 'GENERAL') {
+                    btnCloudSync.classList.remove('amaes-pulse');
+                    btnCloudSync.disabled = false;
+                    btnCloudSync.innerHTML = `${ICONS.cloudDownload} <span>Cloud Sync</span>`;
+                    const entered = prompt("Enter Subject Code to sync from Cloud (e.g. CS6301, ITE6301):", (detectedCodes && detectedCodes[0]) || "");
+                    if (!entered || !entered.trim()) {
+                        setLog("Cloud sync cancelled (no subject code specified).", "var(--accent-amber)", "Select a subject code to sync");
+                        showToast("Cloud sync cancelled.");
+                        return;
+                    }
+                    targetCode = entered.trim().toUpperCase();
+                    subCode = targetCode;
+                    btnCloudSync.disabled = true;
+                    btnCloudSync.classList.add('amaes-pulse');
+                }
+
+                btnCloudSync.innerHTML = `${ICONS.cloud} <span>Syncing ${targetCode}...</span>`;
+                showToast(`Connecting to Cloud Database for ${targetCode}...`, 2500);
+                setLog(`Connecting to community cloud database for <b>${targetCode}</b>...`, "var(--accent-blue)", `Checking GitHub repository for ${targetCode}`);
+
+                try {
+                    let res = null;
+                    try {
+                        res = await syncAnswersFromCloud(targetCode, null, (detectCourseInfo().subjectName || ''));
+                    } catch (cloudErr) {
+                        res = null;
+                    }
+
+                    if (res && res.count > 0) {
+                        const finalDb = getCachedAnswers(targetCode) || [];
+                        const jennyCount = res.jennysonlineCount || 0;
+                        const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(targetCode) : [];
+                        const cachedCount = res.cachedCount || 0;
+                        showToast(`Cloud Sync Success! (${cachedCount} cached; ${jennyCount} unconfirmed Jenny suggestions)`);
+                        setLog(`Synced <b>${cachedCount}</b> cached entries and <b>${jennyCount}</b> locally cached Jenny suggestions for <b>${targetCode}</b>.`, "var(--accent-green)", "Jenny guide suggestions are unconfirmed");
+                        btnCloudSync.classList.remove('amaes-pulse');
+                        btnCloudSync.innerHTML = `${ICONS.check} <span>Synced ${res.count} Qs!</span>`;
+
+                        if (fetchBtnLabel) {
+                            fetchBtnLabel.innerText = `Refresh Answers (${finalDb.length} cached)`;
+                        }
+
+                        updateTermCoverageUI(targetCode);
+
+                        if (checkIsQuizPage()) {
+                            highlightQuizAnswers(finalDb.concat(jennyAnswers), false);
+                        }
+                    } else {
+                        // Fallback to AMAUOED auto-discovery!
+                        setLog(`Cloud repo has no answers for <b>${targetCode}</b> yet. Checking AMAUOED...`, "var(--accent-purple)", `Searching amauoed.com catalog for ${targetCode}`);
+                        showToast(`No cloud answers found for ${targetCode}. Checking AMAUOED...`, 2500);
+                        btnCloudSync.innerHTML = `${ICONS.rotateCcw} <span>Checking AMAUOED...</span>`;
+
+                        const amauoedUrl = await autoFindAmauoedLink(targetCode, detectCourseInfo().subjectName || '');
+                        if (amauoedUrl) {
+                            btnCloudSync.innerHTML = `${ICONS.rotateCcw} <span>Scraping AMAUOED...</span>`;
+                            setLog(`Auto-scraping AMAUOED study guide for <b>${targetCode}</b>...`, "var(--accent-blue)", `Crawling ${amauoedUrl}`);
+                            const scraped = await loadAllAmauoedAnswers(amauoedUrl);
+                            if (scraped && scraped.length > 0) {
+                                mergeAnswersIntoCache(targetCode, scraped, 'AMAUOED');
+                                const finalDb = getCachedAnswers(targetCode) || [];
+                                showToast(`AMAUOED Fallback: Loaded ${scraped.length} questions for ${targetCode}!`, 4000);
+                                setLog(`Scraped <b>${scraped.length}</b> questions from AMAUOED for <b>${targetCode}</b>!`, "var(--accent-green)", "Cached in local database");
+                                btnCloudSync.classList.remove('amaes-pulse');
+                                btnCloudSync.innerHTML = `${ICONS.check} <span>Scraped ${scraped.length} Qs!</span>`;
+                                if (fetchBtnLabel) fetchBtnLabel.innerText = `Refresh Answers (${finalDb.length} cached)`;
+                                updateTermCoverageUI(targetCode);
+                                if (checkIsQuizPage()) highlightQuizAnswers(finalDb, false);
+                            } else {
+                                showToast(`No questions found on AMAUOED for ${targetCode}. Will harvest when you take quizzes!`, 4000);
+                                setLog(`No questions found for <b>${targetCode}</b> on AMAUOED.`, "var(--accent-amber)", "Answers will auto-harvest as you complete quizzes");
+                                btnCloudSync.classList.remove('amaes-pulse');
+                                btnCloudSync.innerHTML = `<span>No Answers Yet</span>`;
+                            }
+                        } else {
+                            showToast(`Course ${targetCode} is not in Cloud Hub yet. It will auto-harvest as you quiz!`, 4000);
+                            setLog(`No answers found on Cloud or AMAUOED for <b>${targetCode}</b>.`, "var(--accent-amber)", "Answers will auto-harvest from quiz attempts and reviews");
+                            btnCloudSync.classList.remove('amaes-pulse');
+                            btnCloudSync.innerHTML = `<span>No Answers Yet</span>`;
+                        }
+                    }
+                } catch (err) {
+                    showToast(`Cloud Sync error: ${err.message}`);
+                    setLog(`Cloud Sync Note: ${err.message}`, "var(--accent-amber)", "You can set custom database link via Config");
+                } finally {
+                    setTimeout(() => {
+                        btnCloudSync.disabled = false;
+                        btnCloudSync.classList.remove('amaes-pulse');
+                        btnCloudSync.innerHTML = `${ICONS.cloudDownload} <span>Cloud Sync</span>`;
+                    }, 3500);
+                }
+            };
+        }
+
+        const btnHarvestGradesDb = document.getElementById('btn-harvest-grades-db');
+        if (btnHarvestGradesDb) {
+            btnHarvestGradesDb.onclick = () => {
+                btnHarvestGradesDb.disabled = true;
+                btnHarvestGradesDb.classList.add('amaes-pulse');
+                btnHarvestGradesDb.innerHTML = `${ICONS.clock} <span>Scanning Quizzes...</span>`;
+                showToast("Scanning completed quizzes for verified answers...", 2500);
+                setLog("Starting quiz answer collection & share...", "var(--accent-blue)", "Scanning completed attempts for verified answers");
+                executeGradesHarvester((curr, total, name) => {
+                    btnHarvestGradesDb.innerHTML = `${ICONS.clock} <span>[${curr}/${total}] ${name}...</span>`;
+                }).then(res => {
+                    btnHarvestGradesDb.classList.remove('amaes-pulse');
+                    if (res && res.success && res.count > 0) {
+                        btnHarvestGradesDb.innerHTML = `${ICONS.check} <span>Collected ${res.count} Qs!</span>`;
+                    } else if (res && res.inProgress) {
+                        btnHarvestGradesDb.innerHTML = `${ICONS.clock} <span>In Progress</span>`;
+                        showToast("Auto-collector is currently scanning past quizzes in background. Please wait...", 3000);
+                        setLog("Collector is <b>actively scanning</b> enrolled courses in background...", "var(--accent-blue)", "Scanning grade items for completed quizzes");
+                    } else if (res && res.success && res.count === 0) {
+                        btnHarvestGradesDb.innerHTML = `${ICONS.check} <span>All Up to Date</span>`;
+                        showToast("Grade report scan complete. All completed quizzes are already in database!", 3500);
+                        setLog("Grade report scan complete. All available quizzes already cached.", "var(--accent-cyan)", "Answers ready in database");
+                    } else {
+                        btnHarvestGradesDb.innerHTML = `<span>Finished</span>`;
+                    }
+                    setTimeout(() => {
+                        btnHarvestGradesDb.disabled = false;
+                        btnHarvestGradesDb.classList.remove('amaes-pulse');
+                        btnHarvestGradesDb.innerHTML = `${ICONS.download} <span>Collect & Share Answers</span>`;
+                    }, 4000);
+                });
+            };
+        }
+
+        if (btnConfigCloud) {
+            btnConfigCloud.onclick = () => {
+                const currentUrl = localStorage.getItem('amaes_cloud_db_url') || cloudDbBaseUrl;
+                const currentToken = localStorage.getItem('amaes_github_token') || '';
+                const choice = prompt(
+                    `CLOUD DATABASE & GITHUB CONFIGURATION\n\n` +
+                    `1. Base URL for Cloud Sync:\n${currentUrl}\n\n` +
+                    `2. GitHub Token (PAT) for 1-Click Push:\n${currentToken ? '••••••••' + currentToken.slice(-4) : '(Not set - Web editor fallback)'}\n\n` +
+                    `Commands:\n` +
+                    `• 'token <YOUR_PAT>' -> Set GitHub Personal Access Token\n` +
+                    `• 'url <NEW_URL>' -> Set raw database URL\n` +
+                    `• 'clear' -> Remove GitHub Token\n\n` +
+                    `Enter command or leave blank:`,
+                    currentToken ? `token ${currentToken}` : `url ${currentUrl}`
+                );
+
+                if (choice) {
+                    const trimmed = choice.trim();
+                    if (trimmed.startsWith('token ')) {
+                        const token = trimmed.replace(/^token\s+/, '').trim();
+                        localStorage.setItem('amaes_github_token', token);
+                        showToast("GitHub Token saved!");
+                        setLog("GitHub Token configured for 1-click commits!", "var(--accent-green)");
+                    } else if (trimmed.startsWith('url ')) {
+                        const url = trimmed.replace(/^url\s+/, '').trim();
+                        localStorage.setItem('amaes_cloud_db_url', url);
+                        cloudDbBaseUrl = url;
+                        showToast("Cloud DB URL updated!");
+                        setLog(`Cloud Database URL updated to <b>${url}</b>`, "var(--accent-blue)");
+                    } else if (trimmed === 'clear') {
+                        localStorage.removeItem('amaes_github_token');
+                        showToast("GitHub Token cleared!");
+                        setLog("GitHub Token cleared.", "var(--text-muted)");
+                    }
+                }
+            };
+        }
+
+        const btnContributeDb = document.getElementById('btn-contribute-db');
+        if (btnContributeDb) {
+            btnContributeDb.onclick = () => {
+                showCommunityContributionModal(subCode);
+            };
+        }
+
+        const syncSettingsCheckbox = (id, checked) => {
+            const welcomeId = {
+                'chk-auto-harvest-grades': 'welcome-chk-harvest',
+                'chk-auto-cloud-sync': 'welcome-chk-sync',
+                'chk-auto-community-share': 'welcome-chk-share',
+                'chk-auto-scrape-amauoed': 'welcome-chk-scrape'
+            }[id];
+            const welcome = welcomeId && document.getElementById(welcomeId);
+            if (welcome) welcome.checked = checked;
+        };
+
+        const chkAutoHarvestGrades = document.getElementById('chk-auto-harvest-grades');
+        if (chkAutoHarvestGrades) {
+            chkAutoHarvestGrades.onchange = (e) => {
+                autoHarvestGrades = e.target.checked;
+                localStorage.setItem('amaes_auto_harvest_grades', autoHarvestGrades);
+                syncSettingsCheckbox('chk-auto-harvest-grades', autoHarvestGrades);
+                showToast(`Auto-harvest past quizzes: ${autoHarvestGrades ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Harvest past quizzes from Grades: <b>${autoHarvestGrades ? 'ON' : 'OFF'}</b>`, autoHarvestGrades ? "var(--accent-green)" : "var(--accent-amber)", autoHarvestGrades ? "Scans completed quizzes for verified teacher answers" : "Manual harvest only");
+            };
+        }
+
+        const chkAutoCloudSync = document.getElementById('chk-auto-cloud-sync');
+        if (chkAutoCloudSync) {
+            chkAutoCloudSync.onchange = (e) => {
+                autoCloudSync = e.target.checked;
+                localStorage.setItem('amaes_auto_cloud_sync', autoCloudSync);
+                syncSettingsCheckbox('chk-auto-cloud-sync', autoCloudSync);
+                showToast(`Auto-pull community answers: ${autoCloudSync ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-pull community answers on course open: <b>${autoCloudSync ? 'ON' : 'OFF'}</b>`, autoCloudSync ? "var(--accent-green)" : "var(--accent-amber)", autoCloudSync ? "Auto-fetches answers upon opening any enrolled course" : "Manual sync only");
+            };
+        }
+
+        const chkAutoCommunityShare = document.getElementById('chk-auto-community-share');
+        if (chkAutoCommunityShare) {
+            chkAutoCommunityShare.onchange = (e) => {
+                autoCommunityShare = e.target.checked;
+                localStorage.setItem('amaes_auto_community_share', autoCommunityShare);
+                syncSettingsCheckbox('chk-auto-community-share', autoCommunityShare);
+                showToast(`Auto-share to Community Hub: ${autoCommunityShare ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-share verified answers on Review: <b>${autoCommunityShare ? 'ON' : 'OFF'}</b>`, autoCommunityShare ? "var(--accent-green)" : "var(--accent-amber)", autoCommunityShare ? "Anonymously contributes new teacher keys on review" : "Sharing disabled");
+                if (checkIsReviewPage()) {
+                    document.querySelectorAll('.amaes-review-status-pill, .amaes-review-outcome-banner').forEach(el => el.remove());
+                    injectReviewQuestionMarkers();
+                }
+            };
+        }
+
+        const chkAutoScrapeAmauoed = document.getElementById('chk-auto-scrape-amauoed');
+        const chkAutoScrapeAmauoedQuiz = document.getElementById('chk-auto-scrape-amauoed-quiz');
+        function handleAutoScrapeToggle(enabled) {
+            autoScrapeAmauoed = enabled;
+            localStorage.setItem('amaes_auto_scrape_amauoed', autoScrapeAmauoed);
+            syncSettingsCheckbox('chk-auto-scrape-amauoed', autoScrapeAmauoed);
+            if (chkAutoScrapeAmauoed) chkAutoScrapeAmauoed.checked = autoScrapeAmauoed;
+            if (chkAutoScrapeAmauoedQuiz) chkAutoScrapeAmauoedQuiz.checked = autoScrapeAmauoed;
+            showToast(`Auto-fetch AMAUOED: ${autoScrapeAmauoed ? 'Enabled' : 'Disabled'}`);
+            setLog(`Auto-fetch AMAUOED when missing: <b>${autoScrapeAmauoed ? 'ON' : 'OFF'}</b>`, autoScrapeAmauoed ? "var(--accent-purple)" : "var(--accent-amber)", autoScrapeAmauoed ? "Discovers and crawls online study guides when missing" : "AMAUOED scraping disabled");
+            if (enabled) {
+                updateAmauoedDisplay(subCode);
+            }
+        }
+        if (chkAutoScrapeAmauoed) {
+            chkAutoScrapeAmauoed.onchange = (e) => handleAutoScrapeToggle(e.target.checked);
+        }
+        if (chkAutoScrapeAmauoedQuiz) {
+            chkAutoScrapeAmauoedQuiz.onchange = (e) => handleAutoScrapeToggle(e.target.checked);
+        }
+
+
+
+
+
+        // If on quiz attempt page, the unified runAutoQuizSolver handles highlighting, auto-picking & auto-next.
+        // Never highlight over graded review pages.
+        const cachedQuestions = subCode ? getCachedAnswers(subCode) : null;
+        if (autoHighlightQuiz && isQuiz && cachedQuestions && !checkIsQuizAttemptPage() && !checkIsReviewPage()) {
+            setTimeout(() => {
+                const res = highlightQuizAnswers(cachedQuestions, false);
+                if (res.matched > 0) {
+                    setLog(`Auto-highlighted <b>${res.matched}/${res.total}</b> answers from database.`, "var(--accent-green)");
+                }
+            }, 600);
+        }
+
+        // --- MODULE 2: Highlighter Module Elements ---
+        setupPersistentAccordion('mod-highlighter-header', 'mod-highlighter-body', 'mod-highlighter-arrow', 'amaes_pref_mod_hl', false);
+
+        const triggerHighlight = (cat, label) => {
+            const isGrades = typeof window !== 'undefined' && window.location.pathname.includes('/grade/report/user/index.php');
+            if (isGrades && cat !== 'quiz') {
+                showToast("Open a course page to highlight lecture items.");
+                setLog("<b>Notice:</b> Open a course subject page to highlight lecture items.", "var(--accent-amber)");
+                return;
+            }
+            const res = highlightItems(cat);
+            if (res.error) {
+                if (isGrades) {
+                    showToast("Open a course page to highlight lecture items.");
+                    setLog("<b>Notice:</b> Open a course subject page to highlight lecture items.", "var(--accent-amber)");
+                } else {
+                    showToast("Open a course page first to highlight items.");
+                    setLog("<b>Action Blocked:</b> Open a course subject first.", "var(--accent-pink)");
+                }
+            } else if (res.count === 0) {
+                showToast(`No ${label} items found to highlight on this page.`);
+                setLog(`No ${label} items found on this page.`, "var(--accent-amber)");
+            } else {
+                showToast(`Highlighted ${res.count} ${label} items!`);
+                setLog(`Highlighted <b>${res.count}</b> ${label} items on page.`, "var(--accent-green)");
+            }
+        };
+
+        const _el__btn_hl_quiz_ = document.getElementById('btn-hl-quiz');
+        if (_el__btn_hl_quiz_) _el__btn_hl_quiz_.onclick = () => triggerHighlight('quiz', 'Quiz/Exam');
+        const _el__btn_hl_lec_ = document.getElementById('btn-hl-lec');
+        if (_el__btn_hl_lec_) _el__btn_hl_lec_.onclick = () => triggerHighlight('lecture', 'Lecture');
+        const _el__btn_hl_vid_ = document.getElementById('btn-hl-vid');
+        if (_el__btn_hl_vid_) _el__btn_hl_vid_.onclick = () => triggerHighlight('video', 'Video');
+        const _el__btn_hl_all_ = document.getElementById('btn-hl-all');
+        if (_el__btn_hl_all_) _el__btn_hl_all_.onclick = () => triggerHighlight('all', 'total');
+        const _el__btn_hl_clear_ = document.getElementById('btn-hl-clear');
+        if (_el__btn_hl_clear_) _el__btn_hl_clear_.onclick = () => {
+            clearAllHighlights();
+            showToast("Cleared all highlights.");
+            setLog("Cleared all highlights.", "var(--text-muted)");
+        };
+
+        const handleMissingQuizzesClick = async () => {
+            showToast("Checking quiz grades and attempt statuses...", 1500);
+            const res = await highlightMissingOrUnansweredQuizzes();
+            if (res.count > 0) {
+                showToast(`Highlighted ${res.count} missing/re-attemptable quizzes!`);
+                setLog(`Found and highlighted <b>${res.count}</b> quizzes needing completion/re-attempt (<80%).`, "var(--accent-amber)");
+            } else if (res.message) {
+                showToast(res.message);
+                setLog(res.message, "var(--accent-green)");
+            } else {
+                showToast("All quizzes achieved passing grade (≥80%)! None pending.");
+                setLog("All quizzes achieved passing grade (≥80%). No pending or missing quizzes!", "var(--accent-green)");
+            }
+        };
+
+        const btnHlMissingQuizzes = document.getElementById('btn-hl-missing-quizzes');
+        if (btnHlMissingQuizzes) {
+            btnHlMissingQuizzes.onclick = handleMissingQuizzesClick;
+        }
+        const btnHlMissingQuizzesCourse = document.getElementById('btn-hl-missing-quizzes-course');
+        if (btnHlMissingQuizzesCourse) {
+            btnHlMissingQuizzesCourse.onclick = handleMissingQuizzesClick;
+        }
+
+        const btnTriggerHlAnswers = document.getElementById('btn-trigger-hl-answers');
+        if (btnTriggerHlAnswers) {
+            btnTriggerHlAnswers.onclick = () => {
+                const courseInfo = detectCourseInfo();
+                const subCode = courseInfo.subjectCode || 'CS6301';
+                const cached = getCachedAnswers(subCode);
+                const isExamSite = typeof isExamPortalDomain === 'function' && isExamPortalDomain();
+                const term = isExamSite ? 'exam' : 'quiz';
+                if (cached && cached.length > 0) {
+                    const res = highlightQuizAnswers(cached, false, true);
+                    if (res.matched === res.total && res.total > 0) {
+                        showToast(`Highlighted all ${res.total} answers!`);
+                        setLog(`Highlighted all <b>${res.total}</b> answers!`, "var(--accent-green)");
+                    } else if (res.matched === 0 && res.total > 0) {
+                        showToast(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`);
+                        setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
+                    } else {
+                        showToast(`Highlighted ${res.matched}/${res.total} answers. (${res.total - res.matched} with no saved answer)`);
+                        setLog(`Highlighted <b>${res.matched}/${res.total}</b> answers. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
+                    }
+                } else if (typeof autoFetchCloudAnswersIfMissing === 'function') {
+                    showToast("Checking cloud database for answers...");
+                    autoFetchCloudAnswersIfMissing(subCode).then(ok => {
+                        if (ok) {
+                            const fresh = getCachedAnswers(subCode);
+                            const res = highlightQuizAnswers(fresh, false, true);
+                            if (res.matched === res.total && res.total > 0) {
+                                showToast(`Highlighted all ${res.total} answers from cloud!`);
+                                setLog(`Highlighted all <b>${res.total}</b> answers from cloud!`, "var(--accent-green)");
+                            } else if (res.matched === 0 && res.total > 0) {
+                                showToast(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`);
+                                setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
+                            } else {
+                                showToast(`Highlighted ${res.matched}/${res.total} answers from cloud. (${res.total - res.matched} with no saved answer)`);
+                                setLog(`Highlighted <b>${res.matched}/${res.total}</b> answers from cloud. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
+                            }
+                        } else {
+                            showToast(`No answers found in database for ${subCode}`);
+                        }
+                    });
+                } else {
+                    showToast(`No answers cached for ${subCode}`);
+                }
+            };
+        }
+
+        // --- MODULE 3: Search Module Elements ---
+        const keywordInput = document.getElementById('search-keyword-input');
+        const copyKeywordBtn = document.getElementById('btn-copy-keyword');
+        const openGoogleBtn = document.getElementById('btn-open-google');
+
+        setupPersistentAccordion('mod-search-header', 'mod-search-body', 'mod-search-arrow', 'amaes_pref_mod_search', false);
+
+        if (copyKeywordBtn) copyKeywordBtn.onclick = async () => {
+            const query = keywordInput ? keywordInput.value.trim() : '';
+            if (!query) {
+                showToast("Enter a search term first!");
+                return;
+            }
+            try {
+                await copyToClipboard(query);
+                setLog(`Copied: "<b>${query}</b>"`, "var(--accent-green)");
+                copyKeywordBtn.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                showToast(`Copied search query: "${query}"`);
+                setTimeout(() => {
+                    copyKeywordBtn.innerHTML = `${ICONS.copy} <span>Copy</span>`;
+                }, 2000);
+            } catch (e) {
+                showToast("Failed to copy search keyword.");
+                setLog("Failed to copy search keyword.", "var(--accent-pink)");
+            }
+        };
+
+        if (openGoogleBtn) openGoogleBtn.onclick = async () => {
+            const query = keywordInput ? keywordInput.value.trim() : '';
+            if (!query) {
+                showToast("Enter a search term first!");
+                return;
+            }
+            try {
+                await copyToClipboard(query);
+            } catch (e) {}
+
+            const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+            window.open(url, '_blank');
+            showToast(`Opened Google search for "${query}"`);
+            setLog(`Opened Google search for: "<b>${query}</b>"`, "var(--accent-blue)");
+        };
+
+        // --- MODULE 4: Smart AI Assistant (Google Gemini) ---
+        setupPersistentAccordion('mod-ai-header', 'mod-ai-body', 'mod-ai-arrow', 'amaes_pref_mod_ai', false);
+
+        const btnOpenGeminiSetup = document.getElementById('btn-open-gemini-setup');
+        if (btnOpenGeminiSetup) {
+            btnOpenGeminiSetup.onclick = () => {
+                showGeminiSetupModal();
+            };
+        }
+
+        const btnQuizConfigAi = document.getElementById('btn-quiz-config-ai');
+        if (btnQuizConfigAi) {
+            btnQuizConfigAi.onclick = () => {
+                showGeminiSetupModal();
+            };
+        }
+
+
+        // Header Reset Settings Button Handler
+        const resetBtn = document.getElementById('amaes-reset-btn');
+        if (resetBtn) {
+            resetBtn.onclick = () => {
+                const ok = confirm(
+                    "Reset AMAES Toolkit to a brand-new installation?\n\n" +
+                    "This clears toolkit settings, cached answer databases, anonymous sharing history, update state, and welcome-page acceptance. " +
+                    "It does not uninstall Violentmonkey or delete Moodle data.\n\n" +
+                    "The welcome setup will reopen after reset. Continue?"
+                );
+                if (ok) {
+                    resetToolkitInstallation();
+                }
+            };
+        }
+
+        // Header Home / Dashboard Navigation Button Handler
+        const homeBtn = document.getElementById('amaes-home-btn');
+        if (homeBtn) {
+            homeBtn.onclick = (e) => {
+                e.preventDefault();
+                showToast("Navigating to My Courses...");
+                window.location.href = getSemesterCoursesUrl();
+            };
+        }
+
+        // Theme Toggle Handler
+        if (themeBtn) themeBtn.onclick = () => {
+            const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(nextTheme);
+            showToast(`Theme switched to ${nextTheme} mode`);
+        };
+
+        // Header Version Pill Click -> Direct Update if available, else quick check
+        const versionPill = document.getElementById('amaes-version-pill');
+        if (versionPill) {
+            versionPill.onclick = () => {
+                const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
+                if (cachedLatest && isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
+                    window.open(SCRIPT_RAW_URL, '_blank');
+                } else {
+                    showToast("Checking GitHub for updates...");
+                    checkForScriptUpdates(true);
+                }
+            };
+        }
+
+        const welcomeUpdateNow = document.getElementById('btn-welcome-update-now');
+        if (welcomeUpdateNow) {
+            welcomeUpdateNow.onclick = (e) => {
+                e.preventDefault();
+                checkForScriptUpdates(true);
+            };
+        }
+
+        // --- MODULE 4: Marker Module Collapse ---
+        setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arrow', 'amaes_pref_mod_marker', !isQuiz);
+
+        setupPersistentAccordion('sub-done-header', 'sub-done-body', 'sub-done-arrow', 'amaes_pref_sub_done', false);
+        setupPersistentAccordion('sub-undo-header', 'sub-undo-body', 'sub-undo-arrow', 'amaes_pref_sub_undo', false);
+
+        // --- MODULE 5: Accounts Module Cards ---
+        setupPersistentAccordion('mod-accounts-switcher-header', 'mod-accounts-switcher-body', 'mod-accounts-switcher-arrow', 'amaes_pref_mod_accounts_switcher', true);
+        setupPersistentAccordion('mod-accounts-transfer-header', 'mod-accounts-transfer-body', 'mod-accounts-transfer-arrow', 'amaes_pref_mod_accounts_transfer', false);
+
+        // Lock State & Terms Acceptance Management
+        const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
+        const lockChk = document.getElementById('amaes-lock-chk-terms');
+        const lockContainer = document.getElementById('amaes-lock-terms-label');
+        const viewTermsBtn = document.getElementById('amaes-btn-lock-view-terms');
+
+        const updatePanelLockState = () => {
+            const isAccepted = (typeof toolkitStorage !== 'undefined' ? toolkitStorage.get('amaes_terms_acknowledged') : null) === 'true' || localStorage.getItem('amaes_terms_acknowledged') === 'true';
+            const isMin = localStorage.getItem('amaes_pref_minimized') === 'true';
+
+            if (!isAccepted) {
+                if (lockOverlay) lockOverlay.style.display = isMin ? 'none' : 'flex';
+                if (bodyEl) bodyEl.style.display = 'none';
+                if (lockChk) lockChk.checked = false;
+                if (lockContainer) lockContainer.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            } else {
+                if (lockOverlay) lockOverlay.style.display = 'none';
+                if (bodyEl) bodyEl.style.display = isMin ? 'none' : 'flex';
+                if (lockChk) lockChk.checked = true;
+            }
+        };
+        window._amaesUpdatePanelLockState = updatePanelLockState;
+
+        if (lockChk) {
+            lockChk.onchange = () => {
+                if (lockChk.checked) {
+                    if (lockContainer) lockContainer.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                    toolkitStorage.set('amaes_terms_acknowledged', 'true');
+                    showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
+                    updatePanelLockState();
+
+                    const welcomeTerms = document.getElementById('welcome-chk-terms');
+                    const welcomeBtn = document.getElementById('btn-got-it-welcome');
+                    if (welcomeTerms) welcomeTerms.checked = true;
+                    if (welcomeBtn) {
+                        welcomeBtn.disabled = false;
+                        welcomeBtn.style.opacity = '1';
+                    }
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    toolkitStorage.set('amaes_terms_acknowledged', 'false');
+                    autoQuizMode = false;
+                    toolkitStorage.set('amaes_auto_quiz_mode', 'false');
+                    showToast("Agreement unaccepted. Pausing all tools and refreshing page...", 2500);
+                    updatePanelLockState();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                }
+            };
+        }
+
+        if (viewTermsBtn) {
+            viewTermsBtn.onclick = () => {
+                showWelcomeOnboardingModal(true);
+            };
+        }
+
+        const bigLockIcon = document.getElementById('amaes-lock-big-icon');
+        if (bigLockIcon) {
+            bigLockIcon.onclick = () => {
+                showWelcomeOnboardingModal(true);
+            };
+        }
+
+        // Panel Minimize State Persistence & Responsive Sync
+        const panelEl = document.getElementById('amaes-toolkit-panel');
+        const updateHudPauseBtnVisibility = () => {
+            const hudPauseBtn = document.getElementById('btn-hud-toggle-quiz');
+            if (hudPauseBtn && panelEl) {
+                const isMin = panelEl.classList.contains('amaes-minimized') || (bodyEl && bodyEl.style.display === 'none');
+                hudPauseBtn.style.display = isMin ? 'inline-flex' : 'none';
+            }
+        };
+
+        const updatePanelMinState = (isMin) => {
+            const backdropEl = document.getElementById('amaes-panel-backdrop');
+            const hudEl = document.getElementById('amaes-quiz-hud');
+            const root = document.documentElement;
+            if (root) {
+                root.classList.toggle('amaes-panel-is-minimized', isMin);
+            }
+            if (backdropEl) {
+                backdropEl.classList.toggle('active', !isMin);
+            }
+            if (hudEl) {
+                const isMobileScreen = (typeof window !== 'undefined' ? (window.innerWidth || 0) : 0) <= 640;
+                if (isMobileScreen) {
+                    hudEl.style.display = isMin ? 'flex' : 'none';
+                } else {
+                    hudEl.style.display = 'flex';
+                }
+            }
+            updateHudPauseBtnVisibility();
+        };
+
+        const deviceState = (typeof detectDeviceMode === 'function') ? detectDeviceMode() : { isMobile: false, isTablet: false };
+        const prefMinimized = localStorage.getItem('amaes_pref_minimized');
+        const savedMinimized = prefMinimized !== null ? (prefMinimized === 'true') : deviceState.isMobile;
+
+        if (savedMinimized) {
+            if (bodyEl) bodyEl.style.display = 'none';
+            if (lockOverlay) lockOverlay.style.display = 'none';
+            if (panelEl) panelEl.classList.add('amaes-minimized');
+            minBtn.innerHTML = `
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                </svg>
+            `;
+            updatePanelMinState(true);
+        } else {
+            updatePanelMinState(false);
+        }
+
+        if (minBtn) minBtn.onclick = (e) => {
+            if (e) e.stopPropagation();
+            const isLocked = !isTermsAcknowledged();
+            const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
+            if (targetEl && targetEl.style.display === 'none') {
+                targetEl.style.display = isLocked ? 'flex' : 'block';
+                if (panelEl) panelEl.classList.remove('amaes-minimized');
+                minBtn.innerHTML = ICONS.minimize;
+                localStorage.setItem('amaes_pref_minimized', 'false');
+                updatePanelMinState(false);
+            } else if (targetEl) {
+                targetEl.style.display = 'none';
+                if (panelEl) panelEl.classList.add('amaes-minimized');
+                minBtn.innerHTML = `
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                `;
+                localStorage.setItem('amaes_pref_minimized', 'true');
+                updatePanelMinState(true);
+            }
+        };
+
+        // Click anywhere on minimized pill to expand
+        if (panelEl) {
+            panelEl.addEventListener('click', (e) => {
+                if (panelEl.classList.contains('amaes-minimized') && !e.target.closest('#amaes-min-btn')) {
+                    const isLocked = !isTermsAcknowledged();
+                    const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
+                    if (targetEl) {
+                        targetEl.style.display = isLocked ? 'flex' : 'block';
+                        panelEl.classList.remove('amaes-minimized');
+                        minBtn.innerHTML = ICONS.minimize;
+                        localStorage.setItem('amaes_pref_minimized', 'false');
+                        updatePanelMinState(false);
+                    }
+                }
+            });
+        }
+
+        // Backdrop click to minimize bottom sheet on mobile
+        const backdropEl = document.getElementById('amaes-panel-backdrop');
+        if (backdropEl) {
+            backdropEl.onclick = (e) => {
+                e.stopPropagation();
+                if (panelEl && !panelEl.classList.contains('amaes-minimized') && minBtn) {
+                    minBtn.click();
+                }
+            };
+        }
+
+        // Pull handle click & swipe-down touch gestures on mobile
+        const sheetHandle = panelEl ? panelEl.querySelector('.amaes-sheet-handle') : null;
+        if (sheetHandle) {
+            sheetHandle.onclick = (e) => {
+                e.stopPropagation();
+                if (panelEl && !panelEl.classList.contains('amaes-minimized') && minBtn) {
+                    minBtn.click();
+                }
+            };
+        }
+
+        let touchStartY = 0;
+        let touchDiffY = 0;
+        const panelDragZone = sheetHandle || (panelEl ? panelEl.querySelector('#amaes-header') : null);
+        if (panelDragZone) {
+            panelDragZone.addEventListener('touchstart', (e) => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                touchStartY = e.touches[0].clientY;
+                touchDiffY = 0;
+            }, { passive: true });
+
+            panelDragZone.addEventListener('touchmove', (e) => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                const currentY = e.touches[0].clientY;
+                touchDiffY = currentY - touchStartY;
+            }, { passive: true });
+
+            panelDragZone.addEventListener('touchend', () => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                if (touchDiffY > 45 && minBtn) {
+                    minBtn.click();
+                }
+                touchDiffY = 0;
+            }, { passive: true });
+        }
+
+        // Initialize lock state
+        updatePanelLockState();
+
+        const helpBtn = document.getElementById('amaes-help-btn');
+        if (helpBtn) {
+            if (helpBtn) helpBtn.onclick = () => {
+                showWelcomeOnboardingModal(true);
+            };
+        }
+
+        const bugBtn = document.getElementById('amaes-bug-btn');
+        if (bugBtn) {
+            bugBtn.onclick = () => {
+                showBugReportModal();
+            };
+        }
+
+        const headerBugBtn = document.getElementById('amaes-bug-header-btn');
+        if (headerBugBtn) {
+            headerBugBtn.onclick = () => {
+                showBugReportModal();
+            };
+        }
+
+        // Debug Copy Handler
+        if (debugBtn) {
+            if (debugBtn) debugBtn.onclick = async () => {
+                logDebug("Exporting debug diagnostic report...");
+                const report = generateDebugReport();
+                try {
+                    await copyToClipboard(report);
+                    debugBtn.innerHTML = ICONS.check;
+                    setLog("Debug report copied to clipboard. You can paste it directly to AI.", "var(--accent-green)");
+                    setTimeout(() => {
+                        debugBtn.innerHTML = ICONS.debug;
+                    }, 2500);
+                } catch (err) {
+                    console.error("Clipboard write error:", err);
+                    setLog("Failed to copy automatically. Check browser console.", "var(--accent-pink)");
+                }
+            };
+        }
+
+        // Activity Log Feed Toggle & Clear Handlers
+        const btnToggleLogs = document.getElementById('amaes-btn-toggle-logs');
+        const activityFeed = document.getElementById('amaes-activity-feed');
+        if (btnToggleLogs && activityFeed) {
+            btnToggleLogs.onclick = (e) => {
+                e.preventDefault();
+                const isHidden = activityFeed.style.display === 'none';
+                activityFeed.style.display = isHidden ? 'flex' : 'none';
+                if (isHidden) renderActivityLogs();
+                localStorage.setItem('amaes_pref_show_logs', isHidden ? 'true' : 'false');
+            };
+
+            const savedShowLogs = localStorage.getItem('amaes_pref_show_logs') === 'true';
+            if (savedShowLogs) {
+                activityFeed.style.display = 'flex';
+                renderActivityLogs();
+            }
+        }
+
+        const btnClearLogs = document.getElementById('amaes-btn-clear-logs');
+        if (btnClearLogs) {
+            btnClearLogs.onclick = (e) => {
+                e.preventDefault();
+                activityHistory.length = 0;
+                renderActivityLogs();
+                const countBadge = document.getElementById('amaes-log-count-badge');
+                if (countBadge) countBadge.innerText = 'Log (0)';
+            };
+        }
+
+        const btnCopyLogs = document.getElementById('amaes-btn-copy-logs');
+        if (btnCopyLogs) {
+            btnCopyLogs.onclick = async (e) => {
+                e.preventDefault();
+
+                if (activityHistory.length === 0) {
+                    showToast("No logs recorded yet to copy!");
+                    return;
+                }
+                const lines = activityHistory.map(item => `[${item.time}] ${item.text}`).reverse();
+                const logText = lines.join('\n');
+                try {
+                    await copyToClipboard(logText);
+                    showToast(`Copied ${activityHistory.length} log entries!`);
+                    setLog(`Copied <b>${activityHistory.length}</b> activity log entries to clipboard.`, "var(--accent-blue)");
+                } catch (err) {
+                    showToast("Failed to copy logs to clipboard.");
+                }
+            };
+        }
+
+        // Batch Execution Engine for Auto-Marker
+        const runBatch = async (goal, category) => {
+            if (isRunning) return;
+
+            if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('autoMarker')) {
+                showToast("Activity Auto-Marker is temporarily disabled by administrator.");
+                setLog("[Admin Notice] Activity Auto-Marker is temporarily disabled by administrator.", "var(--accent-amber)");
+                return;
+            }
+
+            if (!checkIsCoursePage()) {
+                const isGrades = typeof window !== 'undefined' && window.location.pathname.includes('/grade/report/user/index.php');
+                if (isGrades) {
+                    showToast("Open the Course page to mark lecture items as done.");
+                    setLog("<b>Notice:</b> Completion checkboxes only live on Course pages. Open the Course page to mark lectures as done.", "var(--accent-amber)");
+                } else {
+                    showToast("Open a course page first to use Activity Auto-Marker!");
+                    setLog("<b>Action Blocked:</b> You are not on a course page. Open a course subject first.", "var(--accent-pink)");
+                }
+                return;
+            }
+
+            const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
+            if (isExamPortal && category === 'lecture') {
+                showToast("Lectures are not hosted on the Exam Portal.");
+                setLog("<b>Exam Portal Mode:</b> Lectures and reading materials are not hosted on the Exam Portal. Use Exam Auto-Marker instead.", "var(--accent-amber)");
+                return;
+            }
+
+            isRunning = true;
+            shouldStop = false;
+            stopBtn.style.display = 'flex';
+
+            let gradesMap = null;
+            if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
+                setLog(isExamPortal ? "Verifying course grades: Only exams with a passable grade (≥80%) will be marked..." : "Verifying course grades: Only quizzes with a passable grade (≥80%) will be marked...", "var(--accent-blue)");
+                if (typeof fetchCourseGradesMap === 'function') {
+                    gradesMap = await fetchCourseGradesMap();
+                }
+            }
+
+            const actionLabel = goal === 'mark_done' ? 'Marking' : 'Undoing';
+            setLog(`Searching for ${category} items to ${goal === 'mark_done' ? 'complete' : 'undo'}...`);
+
+            const items = findButtons(goal, category, gradesMap);
+            if (items.length === 0) {
+                if (goal === 'mark_done' && (category === 'quiz' || (isExamPortal && category === 'all'))) {
+                    showToast(isExamPortal ? "No exams with passable grade (≥80%) found to mark." : "No quizzes with passable grade (≥80%) found to mark.");
+                    setLog(isExamPortal ? "<b>Zero Matching Exams:</b> Only exams with a passing grade (≥80%) are marked. Incomplete, locked, or failing exams were left untouched." : "<b>Zero Matching Quizzes:</b> Only quizzes with a passing grade (≥80%) are marked. Incomplete, locked, or failing quizzes were left untouched.", "var(--accent-amber)");
+                } else {
+                    showToast(`No uncompleted ${category} items found to ${goal === 'mark_done' ? 'mark' : 'undo'}!`);
+                    setLog(`No matching items found for: <b>${category}</b> (${goal})!`, "var(--accent-green)");
+                }
+                finish();
+                return;
+            }
+
+            showToast(`Found ${items.length} ${category} items to ${goal === 'mark_done' ? 'mark' : 'undo'}. Processing...`, 2500);
+            // Partition items into Fast Track (manual clicks / undo) vs Safe Track (auto-view network fetches)
+            const fastItems = [];
+            const autoViewItems = [];
+
+            for (const item of items) {
+                if (item.isAutoView && item.autoViewUrl) {
+                    autoViewItems.push(item);
+                } else if (item.button) {
+                    fastItems.push(item);
+                }
+            }
+
+            const totalCount = items.length;
+            showToast(`Found ${totalCount} ${category} items to ${goal === 'mark_done' ? 'mark' : 'undo'}. Processing...`, 2500);
+
+            let processedCount = 0;
+
+            // Track 1: Fast Micro-Stagger Queue for Manual Buttons and Undo (Lectures, Passed Quizzes, Undo All)
+            if (fastItems.length > 0 && !shouldStop) {
+                setLog(`Processing ${fastItems.length} manual ${actionLabel.toLowerCase()} actions in high-speed batch...`);
+
+                for (let i = 0; i < fastItems.length; i++) {
+                    if (shouldStop) break;
+
+                    const item = fastItems[i];
+                    processedCount++;
+
+                    // Throttled UI logging to avoid log feed DOM flooding on large lists
+                    if (i === 0 || i === fastItems.length - 1 || i % 3 === 0) {
+                        const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
+                        setLog(`[${processedCount}/${totalCount}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
+                    }
+
+                    // Reliable pointer dispatch without jarring smooth-scroll
+                    if (typeof triggerClick === 'function') {
+                        triggerClick(item.button);
+                    } else {
+                        item.button.click();
+                    }
+
+                    if (goal === 'mark_done') {
+                        try {
+                            item.button.classList.remove('btn-outline-secondary');
+                            item.button.classList.add('btn-outline-success');
+                            item.button.style.opacity = '0.8';
+                        } catch (_) {}
+                    }
+
+                    // Yield to browser event loop: keeps UI 60fps responsive, Stop button functional, and avoids server session queue deadlocks
+                    await new Promise(resolve => setTimeout(resolve, 40));
+                }
+            }
+
+            // Track 2: Safe Sequential Queue for Activities Requiring Page Loads ("To do: View")
+            if (autoViewItems.length > 0 && !shouldStop) {
+                setLog(`Opening ${autoViewItems.length} lecture activities requiring view verification...`, "var(--accent-blue)");
+
+                for (let i = 0; i < autoViewItems.length; i++) {
+                    if (shouldStop) break;
+
+                    const item = autoViewItems[i];
+                    processedCount++;
+                    setLog(`[${processedCount}/${totalCount}] Viewing: <b>${item.title.substring(0, 22)}...</b>`);
+
+                    if (typeof autoViewActivity === 'function') {
+                        await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
+                    }
+
+                    // Safe network cadence
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }
+            }
+
+            if (shouldStop) {
+                showToast(`Stopped. Processed ${processedCount} of ${totalCount} items.`);
+                setLog(`Stopped by user. Processed ${processedCount} of ${totalCount} items.`, "var(--accent-amber)");
+            } else {
+                if (typeof playToolkitSound === 'function') {
+                    playToolkitSound('quest_done');
+                }
+                showToast(`Finished ${actionLabel.toLowerCase()} ${processedCount} items!`);
+                if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any ${isExamPortal ? 'exams' : 'quizzes'} without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
+                } else {
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items!`, "var(--accent-green)");
+                }
+            }
+
+            finish();
+        };
+
+        const finish = () => {
+            isRunning = false;
+            stopBtn.style.display = 'none';
+        };
+
+        if (stopBtn) stopBtn.onclick = () => {
+            shouldStop = true;
+            showToast("Stopping after current item...");
+            setLog('Stopping after current item...', "var(--accent-amber)");
+        };
+
+        // Attach Clicks
+        const _el__btn_mark_lec_ = document.getElementById('btn-mark-lec');
+        if (_el__btn_mark_lec_) _el__btn_mark_lec_.onclick = () => runBatch('mark_done', 'lecture');
+        const _el__btn_mark_quiz_ = document.getElementById('btn-mark-quiz');
+        if (_el__btn_mark_quiz_) _el__btn_mark_quiz_.onclick = () => runBatch('mark_done', 'quiz');
+        const _el__btn_mark_all_ = document.getElementById('btn-mark-all');
+        if (_el__btn_mark_all_) _el__btn_mark_all_.onclick = () => runBatch('mark_done', 'all');
+
+        const _el__btn_undo_lec_ = document.getElementById('btn-undo-lec');
+        if (_el__btn_undo_lec_) _el__btn_undo_lec_.onclick = () => runBatch('undo', 'lecture');
+        const _el__btn_undo_quiz_ = document.getElementById('btn-undo-quiz');
+        if (_el__btn_undo_quiz_) _el__btn_undo_quiz_.onclick = () => runBatch('undo', 'quiz');
+        const _el__btn_undo_all_ = document.getElementById('btn-undo-all');
+        if (_el__btn_undo_all_) _el__btn_undo_all_.onclick = () => runBatch('undo', 'all');
+
+        // Quiz Automation will be initialized once when document is ready
+    }

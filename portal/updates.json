@@ -1,0 +1,12 @@
+{
+  "addons": {
+    "amaes-toolkit@study-tool.org": {
+      "updates": [
+        {
+          "version": "0.1.0",
+          "update_link": "https://study-tool-amaes.pages.dev/downloads/amaes-toolkit.xpi"
+        }
+      ]
+    }
+  }
+}
