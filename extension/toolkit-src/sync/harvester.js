@@ -811,12 +811,16 @@
             qNorm: normalizeText(q.question || q.qRaw),
             ansRaw: q.answer || q.ansRaw,
             ansNorm: normalizeChoice(q.answer || q.ansRaw),
+            answers: Array.isArray(q.answers) && q.answers.length > 0 ? q.answers : undefined,
+            questionType: q.questionType || undefined,
             wrongAnswers: Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [],
             wrongAnswerEvidence: Boolean(q.wrongAnswerEvidence || q.evidenceType === 'moodle_review_elimination'),
             choices: q.choices || [],
             verified: q.verified !== false,
+            deduced: Boolean(q.deduced),
             isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference'),
             evidenceType: q.evidenceType || '',
+            originLabel: q.originLabel || '',
             confirmations: Number(q.confirmations) || 1,
             source: q.source || 'db'
         }));

@@ -1,6 +1,6 @@
 {
   "name": "amaes-toolkit-extension",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "Cross-browser MV3 extension for AMA Online Education (AMAOEd / AMAES) Moodle portals.",

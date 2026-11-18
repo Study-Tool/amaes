@@ -256,6 +256,86 @@
         return bestQue;
     }
 
+    function getQuestionTextInputs(que) {
+        if (!que || typeof que.querySelectorAll !== 'function') return [];
+        const excludedTypes = new Set(['hidden', 'radio', 'checkbox', 'submit', 'button', 'reset', 'image', 'file']);
+        const candidates = que.querySelectorAll(
+            '.formulation input, .formulation textarea, .qtext input, .qtext textarea, .answer input, .answer textarea'
+        );
+        const rawList = candidates.length > 0 ? candidates : que.querySelectorAll('input, textarea');
+        const seen = new Set();
+        const result = [];
+        for (const el of rawList) {
+            if (!el || seen.has(el)) continue;
+            if (typeof el.closest === 'function' && el.closest(
+                '.info, .im-controls, .submitbtns, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-web-ai-row, .amaes-blockage-hud, .amaes-new-question-focus-banner, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint'
+            )) {
+                continue;
+            }
+            const tag = String(el.tagName || '').toUpperCase();
+            if (tag !== 'TEXTAREA') {
+                const rawType = (typeof el.getAttribute === 'function' ? el.getAttribute('type') : '') || el.type || 'text';
+                const inputType = String(rawType).toLowerCase().trim();
+                if (excludedTypes.has(inputType)) continue;
+            }
+            seen.add(el);
+            result.push(el);
+        }
+        return result;
+    }
+
+    function extractQuestionMatchPrompt(que) {
+        if (!que || typeof que.querySelector !== 'function') return '';
+        const qtextElem = que.querySelector('.qtext, .formulation .qtext');
+        const sourceElem = qtextElem || que.querySelector('.formulation, .content');
+        if (!sourceElem || typeof sourceElem.cloneNode !== 'function') {
+            if (typeof extractQuestionData === 'function') {
+                const qData = extractQuestionData(que);
+                return qData && qData.qText ? qData.qText : '';
+            }
+            return '';
+        }
+
+        const qClone = sourceElem.cloneNode(true);
+        qClone.querySelectorAll(
+            'script, style, noscript, .accesshide, .sr-only, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, ' +
+            '.amaes-shortans-hint, .amaes-select-hint, .amaes-select-elim-hint, .amaes-drag-hint, .amaes-unanswered-hint, ' +
+            '.amaes-blockage-hud, .amaes-new-question-focus-banner, .amaes-unsure-help-chip, .amaes-known-wrong-answer-warning, ' +
+            '.amaes-ambiguous-question-match-note, .amaes-pool-changed-hint, .amaes-matching-row-conflict-note, .amaes-study-guide-conflict-note, ' +
+            '.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-review-status-pill, ' +
+            '.amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-web-ai-row, .amaes-card-btn-container, ' +
+            '.amaes-ai-question-tag, .amaes-study-guide-question-tag'
+        ).forEach(el => el.remove());
+
+        if (!qtextElem) {
+            qClone.querySelectorAll('.ablock, .submitbtns, .prompt').forEach(el => el.remove());
+            qClone.querySelectorAll('.answer').forEach(ans => {
+                if (String(ans.tagName || '').toUpperCase() !== 'SPAN' ||
+                    ans.querySelector('input[type="radio"], input[type="checkbox"], select, table')) {
+                    ans.remove();
+                }
+            });
+        }
+
+        qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags').forEach(el => {
+            if (typeof el.replaceWith === 'function' && typeof document !== 'undefined' && typeof document.createTextNode === 'function') {
+                el.replaceWith(document.createTextNode(' '));
+            } else {
+                el.remove();
+            }
+        });
+
+        const cleanText = (typeof cleanDOMToAI === 'function' ? cleanDOMToAI(qClone) : '') ||
+            (qClone.innerText || qClone.textContent || '').trim();
+        if (cleanText) return cleanText;
+
+        if (typeof extractQuestionData === 'function') {
+            const qData = extractQuestionData(que);
+            return qData && qData.qText ? qData.qText : '';
+        }
+        return '';
+    }
+
     // Check whether every question on the current attempt page has an answer selected/entered
     function areAllPageQuestionsAnswered() {
         const queList = document.querySelectorAll('.que');
@@ -293,9 +373,9 @@
             }
 
             // 4. Text input / textarea (shortanswer questions)
-            const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+            const textInputs = getQuestionTextInputs(que);
             if (textInputs.length > 0) {
-                const allFilled = Array.from(textInputs).every(inp => inp.value && inp.value.trim().length > 0);
+                const allFilled = textInputs.every(inp => inp.value && inp.value.trim().length > 0);
                 if (!allFilled) return false;
                 continue;
             }
@@ -344,11 +424,9 @@
                 if (selects.length > 0) {
                     answered = Array.from(selects).every(select => select.value && select.value !== '0');
                 } else {
-                    const textInputs = que.querySelectorAll(
-                        'input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])'
-                    );
+                    const textInputs = getQuestionTextInputs(que);
                     if (textInputs.length > 0) {
-                        answered = Array.from(textInputs).every(input => input.value && input.value.trim());
+                        answered = textInputs.every(input => input.value && input.value.trim());
                     } else {
                         const placeInputs = que.querySelectorAll('input.placeinput, input[type="hidden"][name*="_p"]');
                         const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
@@ -1249,9 +1327,7 @@
             });
         });
 
-        const textInputs = document.querySelectorAll(
-            '.que input[type="text"].form-control, .que input.form-control, .que textarea'
-        );
+        const textInputs = Array.from(document.querySelectorAll('.que')).flatMap(que => getQuestionTextInputs(que));
         textInputs.forEach(inp => {
             if (inp.dataset.amaesAutoNextBound) return;
             inp.dataset.amaesAutoNextBound = 'true';
@@ -1468,7 +1544,7 @@
 
                 const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
                 const selectInputs = que.querySelectorAll('select');
-                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+                const textInputs = getQuestionTextInputs(que);
 
                 let isFullyVerified = false;
                 if (hasVerifiedBadge && !hasAdaptiveBadge && !hasAiBadge && !hasUnverifiedBadge) {
@@ -1478,9 +1554,11 @@
                 } else if (selectInputs.length > 0) {
                     isFullyVerified = que.querySelectorAll('.amaes-select-hint').length >= selectInputs.length;
                 } else if (textInputs.length > 0) {
-                    isFullyVerified = que.querySelectorAll('.amaes-shortans-hint').length >= textInputs.length;
+                    const shortAnsHints = Array.from(que.querySelectorAll('.amaes-shortans-hint'));
+                    isFullyVerified = shortAnsHints.length >= textInputs.length &&
+                        shortAnsHints.every(hint => hint.dataset.amaesConfirmed !== 'false');
                 } else if (hasShortAnsHint || hasSelectHint || hasDragHint) {
-                    isFullyVerified = true;
+                    isFullyVerified = hasShortAnsHint ? hasShortAnsHint.dataset.amaesConfirmed !== 'false' : true;
                 }
 
                 if (!isFullyVerified) {
@@ -1511,6 +1589,8 @@
             // Co-Pilot: Auto-Pick & Next IF Known, WAIT if Unknown
             // Case A: 100% of questions on this page were verified & answered by database!
             if (unverifiedQuestions.length === 0 && res.total > 0) {
+                isWaitingForUserAnswer = false;
+                syncAutoQuizUI();
                 const allAnswered = areAllPageQuestionsAnswered();
                 if (allAnswered) {
                     setLog(`All <b>${res.total}</b> question(s) verified & picked!`, "var(--accent-green)");
@@ -5272,33 +5352,42 @@
                 return;
             }
 
-            const qtextElem = que.querySelector('.qtext, .formulation .qtext');
-            if (!qtextElem) return;
+            const moodleQRaw = extractQuestionMatchPrompt(que);
+            if (!moodleQRaw) return;
 
             // Redundant whole-card matching action button (.amaes-ai-matching-run-btn) is cleaned up
             // in favor of individual row '+ AI' buttons (allowAnswered: true) to eliminate button clutter and 15 RPM rate limit exhaustion.
             que.querySelectorAll('.amaes-ai-matching-run-btn').forEach(el => el.remove());
 
-            // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
-            const qClone = qtextElem.cloneNode(true);
-            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-new-question-focus-banner, .amaes-unsure-help-chip, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
-            const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
-
             const currentQuestionKey = normalizeQuestionMatchKey(moodleQNorm);
             let matchingCandidates = questionCandidateIndex.get(currentQuestionKey) || [];
             const exactCandidates = matchingCandidates;
             const matchingQuestionKeys = new Set(exactCandidates.length > 0 ? [currentQuestionKey] : []);
+            const distinctFuzzyAnswers = new Set();
             if (exactCandidates.length === 0) {
                 matchingCandidates = [];
                 questionCandidateIndex.forEach((items, candidateKey) => {
                     if (questionTextMatches(candidateKey, currentQuestionKey)) {
-                        matchingQuestionKeys.add(candidateKey);
+                        const answeredItems = items.filter(item =>
+                            Boolean((item.ansNorm || normalizeChoice(item.ansRaw || item.answer || '')).trim())
+                        );
+                        if (answeredItems.length > 0) {
+                            matchingQuestionKeys.add(candidateKey);
+                            answeredItems.forEach(item => {
+                                const ansKey = item.ansNorm || normalizeChoice(item.ansRaw || item.answer || '');
+                                if (ansKey) distinctFuzzyAnswers.add(ansKey);
+                            });
+                        }
                         matchingCandidates.push(...items);
                     }
                 });
             }
-            const hasAmbiguousQuestionMatch = exactCandidates.length === 0 && matchingQuestionKeys.size > 1;
+            // Only pause when multiple legacy/fuzzy keys actually disagree on their answer;
+            // duplicate key variants or wrong-answer-only elimination entries with the same answer remain safe.
+            const hasAmbiguousQuestionMatch = exactCandidates.length === 0 &&
+                matchingQuestionKeys.size > 1 &&
+                distinctFuzzyAnswers.size > 1;
             let candidates = exactCandidates.length > 0
                 ? exactCandidates
                 : (hasAmbiguousQuestionMatch ? [] : matchingCandidates);
@@ -6216,7 +6305,7 @@
 
             // Handle Short Answer / Text inputs (both standard and inline cloze inputs)
             if (!foundMatchForQuestion) {
-                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+                const textInputs = getQuestionTextInputs(que);
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
                     // Exclude multiple-choice, True/False, and choice-letter candidates from text inputs
                     const shortAnsCandidates = validCandidates.filter(cand => {
@@ -6245,114 +6334,123 @@
                                 dbCandidate: validCandidates[0] || null
                             });
                         }
-                        return;
-                    }
-                    const bestCand = shortAnsCandidates[0];
-                    const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
-                    const studyGuide = isConfirmedCandidate(bestCand)
-                        ? null
-                        : (getStudyGuideInfo(bestCand) || (bestCand && Boolean(bestCand.source || '').toLowerCase().includes('community') ? { label: 'Community', url: null } : null));
-                    const isStudyGuide = Boolean(studyGuide);
-                    const courseInfo = detectCourseInfo();
-                    const subCode = courseInfo.subjectCode || 'CS6301';
-                    const amauoedUrl = getStoredAmauoedUrl(subCode) || 'https://amauoed.com/courses';
-                    const sourceColor = isStudyGuide ? '#0284c7' : (bestCand && isConfirmedCandidate(bestCand) ? '#10b981' : '#3b82f6');
-                    const sourceBg = isStudyGuide ? 'rgba(2, 132, 199, 0.1)' : (bestCand && isConfirmedCandidate(bestCand) ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)');
-                    const guideUrl = studyGuide && studyGuide.url ? studyGuide.url : amauoedUrl;
-                    const sourceTitle = studyGuide
-                        ? `<a href="${guideUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="color:${sourceColor}; font-weight:700; text-decoration:underline; cursor:pointer;" title="Unconfirmed study-guide suggestion: ${studyGuide.label}">Suggested (${studyGuide.label}, unconfirmed):</a>`
-                        : isConfirmedCandidate(bestCand) ? 'Verified Answer:' : 'Unconfirmed Candidate:';
-
-                    // Parse potential multi-blank answers if multiple inputs exist in the question
-                    let candAnswers = [];
-                    if (Array.isArray(bestCand.answers) && bestCand.answers.length > 0) {
-                        candAnswers = bestCand.answers.map(s => cleanFillBlankAnswer(s)).filter(Boolean);
-                    } else if (textInputs.length > 1 && (bestAnswer.includes(',') || bestAnswer.includes('\n') || bestAnswer.includes(';') || bestAnswer.includes('|'))) {
-                        candAnswers = bestAnswer.split(/[\n,;|]+/).map(s => cleanFillBlankAnswer(s)).filter(Boolean);
                     } else {
-                        candAnswers = [cleanFillBlankAnswer(bestAnswer)].filter(Boolean);
-                    }
+                        const bestCand = shortAnsCandidates[0];
+                        const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
+                        const confirmedShortAns = isConfirmedCandidate(bestCand);
+                        const studyGuide = confirmedShortAns
+                            ? null
+                            : (getStudyGuideInfo(bestCand) || (bestCand && Boolean(bestCand.source || '').toLowerCase().includes('community') ? { label: 'Community', url: null } : null));
+                        const isStudyGuide = Boolean(studyGuide);
+                        const courseInfo = detectCourseInfo();
+                        const subCode = courseInfo.subjectCode || 'CS6301';
+                        const amauoedUrl = getStoredAmauoedUrl(subCode) || 'https://amauoed.com/courses';
+                        const sourceColor = isStudyGuide ? '#0284c7' : (confirmedShortAns ? '#10b981' : '#3b82f6');
+                        const sourceBg = isStudyGuide ? 'rgba(2, 132, 199, 0.1)' : (confirmedShortAns ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)');
+                        const guideUrl = studyGuide && studyGuide.url ? studyGuide.url : amauoedUrl;
+                        const sourceTitle = studyGuide
+                            ? `<a href="${guideUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="color:${sourceColor}; font-weight:700; text-decoration:underline; cursor:pointer;" title="Unconfirmed study-guide suggestion: ${studyGuide.label}">Suggested (${studyGuide.label}, unconfirmed):</a>`
+                            : confirmedShortAns ? 'Verified Answer:' : 'Unconfirmed Candidate:';
 
-                    textInputs.forEach((textInput, idx) => {
-                        const rawTarget = textInputs.length === 1 ? (candAnswers[0] || bestAnswer || '') : (candAnswers[idx] || '');
-                        const targetAns = cleanFillBlankAnswer(rawTarget);
-                        if (!targetAns) return;
+                        // Parse potential multi-blank answers if multiple inputs exist in the question
+                        let candAnswers = [];
+                        if (Array.isArray(bestCand.answers) && bestCand.answers.length > 0) {
+                            candAnswers = bestCand.answers.map(s => cleanFillBlankAnswer(s)).filter(Boolean);
+                        } else if (textInputs.length > 1 && (bestAnswer.includes(',') || bestAnswer.includes('\n') || bestAnswer.includes(';') || bestAnswer.includes('|'))) {
+                            candAnswers = bestAnswer.split(/[\n,;|]+/).map(s => cleanFillBlankAnswer(s)).filter(Boolean);
+                        } else {
+                            candAnswers = [cleanFillBlankAnswer(bestAnswer)].filter(Boolean);
+                        }
 
-                        textInput.style.outline = `2px solid ${sourceColor}`;
-                        textInput.style.backgroundColor = sourceBg;
-                        textInput.style.borderRadius = '4px';
+                        textInputs.forEach((textInput, idx) => {
+                            const rawTarget = textInputs.length === 1 ? (candAnswers[0] || bestAnswer || '') : (candAnswers[idx] || '');
+                            const targetAns = cleanFillBlankAnswer(rawTarget);
+                            if (!targetAns) return;
 
-                        let hint = que.querySelector(`.amaes-shortans-hint[data-input-idx="${idx}"]`);
-                        if (!hint) {
-                            hint = document.createElement('div');
-                            hint.className = 'amaes-shortans-hint';
-                            hint.setAttribute('data-input-idx', String(idx));
-                            hint.innerHTML = `
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <span><span style="color:${sourceColor}; font-weight:700;">${sourceTitle}</span> <b>${targetAns}</b></span>
-                                    <button type="button" class="amaes-fill-btn" style="
-                                        background: ${sourceColor};
-                                        color: #ffffff;
-                                        border: none;
-                                        border-radius: 4px;
-                                        padding: 2px 7px;
-                                        font-size: 10px;
-                                        font-weight: 700;
-                                        cursor: pointer;
-                                        display: ${autoQuizMode ? 'none' : 'inline-flex'};
-                                        align-items: center;
-                                        gap: 3px;
-                                        white-space: nowrap;
-                                        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-                                    ">${ICONS.zap} Fill</button>
-                                </div>
-                            `;
-                            hint.style.cssText = `font-size: 11px; margin-top: 5px; margin-bottom: 3px; padding: 5px 9px; background: ${sourceBg}; border-left: 3px solid ${sourceColor}; border-radius: 4px; cursor: pointer; transition: background 0.15s;`;
-                            hint.title = `Click to auto-fill "${targetAns}" into answer field`;
+                            textInput.style.outline = `2px solid ${sourceColor}`;
+                            textInput.style.backgroundColor = sourceBg;
+                            textInput.style.borderRadius = '4px';
 
-                            const fillFn = (e) => {
-                                if (e && e.target && e.target.closest('a')) return;
-                                if (e) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
+                            let hint = que.querySelector(`.amaes-shortans-hint[data-input-idx="${idx}"]`);
+                            if (!hint) {
+                                hint = document.createElement('div');
+                                hint.className = 'amaes-shortans-hint';
+                                hint.setAttribute('data-input-idx', String(idx));
+                                hint.dataset.amaesConfirmed = confirmedShortAns ? 'true' : 'false';
+                                hint.innerHTML = `
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                        <span><span style="color:${sourceColor}; font-weight:700;">${sourceTitle}</span> <b>${targetAns}</b></span>
+                                        <button type="button" class="amaes-fill-btn" style="
+                                            background: ${sourceColor};
+                                            color: #ffffff;
+                                            border: none;
+                                            border-radius: 4px;
+                                            padding: 2px 7px;
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            cursor: pointer;
+                                            display: ${autoQuizMode ? 'none' : 'inline-flex'};
+                                            align-items: center;
+                                            gap: 3px;
+                                            white-space: nowrap;
+                                            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+                                        ">${ICONS.zap} Fill</button>
+                                    </div>
+                                `;
+                                hint.style.cssText = `font-size: 11px; margin-top: 5px; margin-bottom: 3px; padding: 5px 9px; background: ${sourceBg}; border-left: 3px solid ${sourceColor}; border-radius: 4px; cursor: pointer; transition: background 0.15s;`;
+                                hint.title = `Click to auto-fill "${targetAns}" into answer field`;
+
+                                const fillFn = (e) => {
+                                    if (e && e.target && e.target.closest('a')) return;
+                                    if (e) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }
+                                    setInputValueWithEvents(textInput, targetAns);
+                                    showToast(`Filled: ${targetAns}`);
+                                    hint.style.background = 'rgba(16, 185, 129, 0.2)';
+                                    const btn = hint.querySelector('.amaes-fill-btn');
+                                    if (btn) btn.innerText = 'Filled';
+                                };
+
+                                hint.onclick = fillFn;
+                                const fillBtn = hint.querySelector('.amaes-fill-btn');
+                                if (fillBtn) fillBtn.onclick = fillFn;
+
+                                const paragraphHost = typeof textInput.closest === 'function' ? textInput.closest('p') : null;
+                                if (paragraphHost && paragraphHost !== que && typeof paragraphHost.insertAdjacentElement === 'function') {
+                                    paragraphHost.insertAdjacentElement('afterend', hint);
+                                } else if (textInput.parentElement && textInput.parentElement !== que) {
+                                    textInput.parentElement.appendChild(hint);
+                                } else if (typeof textInput.insertAdjacentElement === 'function') {
+                                    textInput.insertAdjacentElement('afterend', hint);
                                 }
+                            } else {
+                                hint.dataset.amaesConfirmed = confirmedShortAns ? 'true' : 'false';
+                            }
+
+                            // Auto-fill when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
+                            const canAutoFill = (isManualSelect && confirmedShortAns) ||
+                                (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
+                                    (confirmedShortAns ||
+                                        (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
+                            const currentInputNorm = normalizeChoice(textInput.value || '');
+                            const currentInputIsKnownWrong = currentInputNorm && allWrongList.some(w =>
+                                normalizeChoice(w.norm || w.text || w) === currentInputNorm
+                            );
+                            if (canAutoFill && (!String(textInput.value || '').trim() || currentInputIsKnownWrong)) {
                                 setInputValueWithEvents(textInput, targetAns);
-                                showToast(`Filled: ${targetAns}`);
                                 hint.style.background = 'rgba(16, 185, 129, 0.2)';
                                 const btn = hint.querySelector('.amaes-fill-btn');
                                 if (btn) btn.innerText = 'Filled';
-                            };
-
-                            hint.onclick = fillFn;
-                            const fillBtn = hint.querySelector('.amaes-fill-btn');
-                            if (fillBtn) fillBtn.onclick = fillFn;
-
-                            // Insert hint directly after input container or into question
-                            if (textInput.parentElement && textInput.parentElement !== que) {
-                                textInput.parentElement.appendChild(hint);
-                            } else {
-                                textInput.insertAdjacentElement('afterend', hint);
+                                if (!confirmedShortAns && isStudyGuide && autoQuizMode && autoPickStudyGuideFallback) {
+                                    que.dataset.amaesStudyGuideFallbackPicked = 'true';
+                                }
                             }
-                        }
+                        });
 
-                        // Auto-fill when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                        const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||
-                            (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                (isConfirmedCandidate(bestCand) ||
-                                    (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
-                        const currentInputNorm = normalizeChoice(textInput.value || '');
-                        const currentInputIsKnownWrong = currentInputNorm && allWrongList.some(w =>
-                            normalizeChoice(w.norm || w.text || w) === currentInputNorm
-                        );
-                        if (canAutoFill && (!textInput.value || currentInputIsKnownWrong)) {
-                            setInputValueWithEvents(textInput, targetAns);
-                            hint.style.background = 'rgba(16, 185, 129, 0.2)';
-                            const btn = hint.querySelector('.amaes-fill-btn');
-                            if (btn) btn.innerText = 'Filled';
-                        }
-                    });
-
-                    foundMatchForQuestion = true;
+                        foundMatchForQuestion = true;
+                    }
                 }
             }
 
@@ -6873,6 +6971,9 @@
                 }
             } else {
                 que.classList.remove('amaes-no-answer-que');
+                if (isQuestionAnswered(que)) {
+                    que.querySelectorAll('.amaes-blockage-hud, .amaes-new-question-focus-banner, .amaes-unanswered-hint, .amaes-unsure-help-chip').forEach(el => el.remove());
+                }
                 matchedCount++;
             }
 

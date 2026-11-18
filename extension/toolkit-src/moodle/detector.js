@@ -342,6 +342,7 @@
             .replace(/^(?:(?:identify\s+(?:the\s+)?(?:following|term|what\s+is\s+being\s+described)|fill\s+in\s+the\s+blanks?|complete\s+the\s+(?:statement|sentence|following)|identification|identify))\s*[:.-]*\s*/i, '')
             .replace(/^[:?!;,—–-]+\s*/g, '')
             .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
+            .replace(/\s+\banswer\s+question\s*(?:no\.?|#)?\s*\d+[\s:.-]*$/i, '')
             .replace(/^(?:(?:this\s+(?:command|method|function)|jquery\s+(?:method|command|function)|it)\s+(?:is\s+)?(?:used\s+to\s+|that\s+is\s+used\s+to\s+))/i, '')
             .replace(/\bcreates\b/gi, 'create')
             .replace(/\s+/g, ' ')
