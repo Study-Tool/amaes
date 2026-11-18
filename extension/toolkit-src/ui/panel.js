@@ -566,7 +566,7 @@
                                 <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
                                 <span>Return to current page after switch</span>
                             </label>
-                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your userscript manager on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
+                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your browser extension storage on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
                             <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
                         `)}
                     </div>

@@ -1336,7 +1336,7 @@
                 const ok = confirm(
                     "Reset AMAES Toolkit to a brand-new installation?\n\n" +
                     "This clears toolkit settings, cached answer databases, anonymous sharing history, update state, and welcome-page acceptance. " +
-                    "It does not uninstall Violentmonkey or delete Moodle data.\n\n" +
+                    "It does not uninstall the extension or delete Moodle data.\n\n" +
                     "The welcome setup will reopen after reset. Continue?"
                 );
                 if (ok) {
@@ -1370,7 +1370,7 @@
                 if (cachedLatest && isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
                     window.open(SCRIPT_RAW_URL, '_blank');
                 } else {
-                    showToast("Checking GitHub for updates...");
+                    showToast("Checking for AMAES Toolkit updates...");
                     checkForScriptUpdates(true);
                 }
             };

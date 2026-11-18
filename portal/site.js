@@ -2,7 +2,7 @@
   'use strict';
 
   const RELAY_BASE_URL = 'https://amaes-community-relay.study-tool-amaes-relay.workers.dev';
-  let latestVersion = '0.1.0';
+  let latestVersion = '0.1.1';
 
   function getDownloadMeta(browser, version) {
     const cleanVer = String(version || '0.1.0').replace(/^v/i, '');

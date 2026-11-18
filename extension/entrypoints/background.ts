@@ -10,6 +10,16 @@ interface GmXhrMessage {
   headers?: Record<string, string>;
   data?: string | null;
   timeout?: number;
+  responseType?: 'text' | 'json' | 'blob';
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 interface ExtNotifyMessage {
@@ -104,11 +114,25 @@ export default defineBackground(() => {
       })
         .then(async (res) => {
           clearTimeout(timer);
-          const responseText = await res.text();
           const headerLines: string[] = [];
           res.headers.forEach((value, key) => {
             headerLines.push(`${key}: ${value}`);
           });
+          if (req.responseType === 'blob') {
+            const buf = await res.arrayBuffer();
+            return {
+              ok: res.ok,
+              timedOut: false,
+              status: res.status,
+              statusText: res.statusText,
+              responseText: '',
+              responseBase64: arrayBufferToBase64(buf),
+              contentType: res.headers.get('content-type') || 'application/octet-stream',
+              responseHeaders: headerLines.join('\r\n'),
+              finalUrl: res.url || req.url,
+            };
+          }
+          const responseText = await res.text();
           return {
             ok: res.ok,
             timedOut: false,

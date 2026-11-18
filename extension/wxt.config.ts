@@ -5,7 +5,7 @@ export default defineConfig({
     name: 'AMAES Toolkit',
     description:
       'Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals.',
-    version: '0.1.0',
+    version: '0.1.1',
     author: 'Study-Tool Maintainers',
     homepage_url: 'https://study-tool-amaes.pages.dev/',
     icons: {

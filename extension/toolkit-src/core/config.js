@@ -289,7 +289,23 @@
 
     function getRemoteFeatureFlags() {
         try {
-            return JSON.parse(localStorage.getItem('amaes_remote_flags') || '{}');
+            const preloaded = (typeof globalThis !== 'undefined' && globalThis.__AMAES_REMOTE_CONFIG__ && globalThis.__AMAES_REMOTE_CONFIG__.flags)
+                ? globalThis.__AMAES_REMOTE_CONFIG__.flags
+                : null;
+            const stored = JSON.parse(localStorage.getItem('amaes_remote_flags') || '{}');
+            return Object.assign({}, preloaded || {}, stored);
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function getRemoteSelectors() {
+        try {
+            const preloaded = (typeof globalThis !== 'undefined' && globalThis.__AMAES_REMOTE_CONFIG__ && globalThis.__AMAES_REMOTE_CONFIG__.selectors)
+                ? globalThis.__AMAES_REMOTE_CONFIG__.selectors
+                : null;
+            const stored = JSON.parse(localStorage.getItem('amaes_remote_selectors') || '{}');
+            return Object.assign({}, preloaded || {}, stored);
         } catch (_) {
             return {};
         }
@@ -302,10 +318,9 @@
         return false;
     }
 
-    const SCRIPT_RAW_URL = "https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js";
-    const GITHUB_REPO_URL = "https://github.com/Acads-Tools/amaes-toolkit";
-    const GREASYFORK_URL = "https://greasyfork.org/en/scripts/594744-amaes-toolkit";
-    const WEBSITE_URL = "https://amaestoolkit.pages.dev/";
+    const SCRIPT_RAW_URL = "https://study-tool-amaes.pages.dev/#install-step";
+    const GITHUB_REPO_URL = "https://github.com/Study-Tool/amaes";
+    const WEBSITE_URL = "https://study-tool-amaes.pages.dev/";
 
     // Dynamic semester path detector (never hardcode e.g. /2612/ since term codes change every semester)
     function getSemesterBasePath() {

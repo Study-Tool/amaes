@@ -12,7 +12,7 @@ export function bootToolkit(gmApi) {
 
 // --- core/config.js ---
 
-    const SCRIPT_VERSION = "v0.1.0";
+    const SCRIPT_VERSION = "v0.1.1";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.study-tool-amaes-relay.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -300,7 +300,23 @@ export function bootToolkit(gmApi) {
 
     function getRemoteFeatureFlags() {
         try {
-            return JSON.parse(localStorage.getItem('amaes_remote_flags') || '{}');
+            const preloaded = (typeof globalThis !== 'undefined' && globalThis.__AMAES_REMOTE_CONFIG__ && globalThis.__AMAES_REMOTE_CONFIG__.flags)
+                ? globalThis.__AMAES_REMOTE_CONFIG__.flags
+                : null;
+            const stored = JSON.parse(localStorage.getItem('amaes_remote_flags') || '{}');
+            return Object.assign({}, preloaded || {}, stored);
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function getRemoteSelectors() {
+        try {
+            const preloaded = (typeof globalThis !== 'undefined' && globalThis.__AMAES_REMOTE_CONFIG__ && globalThis.__AMAES_REMOTE_CONFIG__.selectors)
+                ? globalThis.__AMAES_REMOTE_CONFIG__.selectors
+                : null;
+            const stored = JSON.parse(localStorage.getItem('amaes_remote_selectors') || '{}');
+            return Object.assign({}, preloaded || {}, stored);
         } catch (_) {
             return {};
         }
@@ -315,7 +331,6 @@ export function bootToolkit(gmApi) {
 
     const SCRIPT_RAW_URL = "https://study-tool-amaes.pages.dev/#install-step";
     const GITHUB_REPO_URL = "https://github.com/Study-Tool/amaes";
-    const GREASYFORK_URL = "https://greasyfork.org/en/scripts/594744-amaes-toolkit";
     const WEBSITE_URL = "https://study-tool-amaes.pages.dev/";
 
     // Dynamic semester path detector (never hardcode e.g. /2612/ since term codes change every semester)
@@ -568,52 +583,22 @@ export function bootToolkit(gmApi) {
             localStorage.setItem('amaes_pending_update_time', String(Date.now()));
             localStorage.setItem('amaes_update_in_progress', '1');
         } catch (e) {}
-        showToast(`Opening v${ver} installer... After confirming in Violentmonkey, page will auto-refresh!`, 6500);
+        showToast(`Opening AMAES Toolkit v${ver} download page...`, 5000);
         try {
             window.open(SCRIPT_RAW_URL, '_blank');
         } catch (e) {
             window.location.href = SCRIPT_RAW_URL;
         }
-
-        // Fallback auto-refresh: In case student confirms update without switching focus (e.g. mobile popup), auto-refresh after 6s
-        setTimeout(() => {
-            const pending = localStorage.getItem('amaes_pending_update_install');
-            if (pending && isNewerVersion(pending, SCRIPT_VERSION) && document.visibilityState === 'visible') {
-                sessionStorage.setItem('amaes_update_attempted_reload', '1');
-                showToast(`Update v${ver} detected! Refreshing page to apply...`, 2000);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
-        }, 6000);
     }
 
     function triggerScriptReinstall() {
         const ver = SCRIPT_VERSION;
-        try {
-            localStorage.setItem('amaes_pending_reinstall', '1');
-            localStorage.setItem('amaes_pending_update_time', String(Date.now()));
-            localStorage.setItem('amaes_update_in_progress', '1');
-        } catch (e) {}
-        showToast(`Opening ${ver} in Violentmonkey... After confirming reinstall, page will auto-refresh!`, 6500);
+        showToast(`Opening AMAES Toolkit ${ver} download page...`, 5000);
         try {
             window.open(SCRIPT_RAW_URL, '_blank');
         } catch (e) {
             window.location.href = SCRIPT_RAW_URL;
         }
-
-        // Fallback auto-refresh: In case student confirms reinstall without switching focus (e.g. mobile popup), auto-refresh after 6s
-        setTimeout(() => {
-            const isReinstalling = localStorage.getItem('amaes_pending_reinstall');
-            if (isReinstalling && document.visibilityState === 'visible') {
-                localStorage.removeItem('amaes_pending_reinstall');
-                sessionStorage.setItem('amaes_reinstall_confirmed', '1');
-                showToast(`Reinstall confirmed! Refreshing page...`, 2000);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
-        }, 6000);
     }
 
     function injectTopNavUpdateNotification(latestVersion) {
@@ -667,7 +652,7 @@ export function bootToolkit(gmApi) {
                     align-items: center;
                     gap: 5px;
                     line-height: 1.3;
-                " title="Update v${pending} is queued in the userscript manager">
+                " title="Update v${pending} is ready to download">
                     ${ICONS.check} Update v${pending} queued
                 </span>
             `;
@@ -822,16 +807,16 @@ export function bootToolkit(gmApi) {
                 const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
                 const elapsed = now - updateTime;
 
-                // Auto-refresh when student returns from confirming in Violentmonkey / script manager
+                // Auto-refresh when student returns after updating the extension
                 if (elapsed >= 1000) {
                     isReloading = true;
                     sessionStorage.setItem('amaes_update_attempted_reload', '1');
-                    showToast(`Update detected! Refreshing page to apply v${pending}...`, 2500);
+                    showToast(`Refreshing page to apply v${pending}...`, 2500);
                     setTimeout(() => {
                         window.location.reload();
                     }, 1000);
                 } else {
-                    showToast(`Update v${pending} is queued in Violentmonkey. It will apply when the userscript manager reloads the script.`, 5000);
+                    showToast(`Download AMAES Toolkit v${pending} from the install page and reload the extension.`, 5000);
                 }
             } catch (e) {}
         };
@@ -870,7 +855,7 @@ export function bootToolkit(gmApi) {
             const targetPending = pending ? (pending.startsWith('v') ? pending : `v${pending}`) : '';
             if (pending) {
                 versionPill.innerHTML = `${SCRIPT_VERSION} <span style="font-size: 8px; margin-left: 2px; color: #f59e0b; font-weight: 800;">→ ${targetPending}</span>`;
-                versionPill.title = `Update ${targetPending} is waiting for confirmation in Violentmonkey`;
+                versionPill.title = `Update ${targetPending} is ready to apply`;
                 versionPill.style.borderColor = '#f59e0b';
                 versionPill.style.color = '#f59e0b';
                 versionPill.onclick = () => {
@@ -12411,21 +12396,21 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
     async function getAccountSwitcherValue(key, fallbackValue = null) {
         if (typeof GM_getValue !== 'function') {
-            throw new Error('Account Switcher requires a userscript manager with GM storage support.');
+            throw new Error('Account Switcher requires extension storage support.');
         }
         return await GM_getValue(key, fallbackValue);
     }
 
     async function setAccountSwitcherValue(key, value) {
         if (typeof GM_setValue !== 'function') {
-            throw new Error('Account Switcher requires a userscript manager with GM storage support.');
+            throw new Error('Account Switcher requires extension storage support.');
         }
         await GM_setValue(key, value);
     }
 
     async function deleteAccountSwitcherValue(key) {
         if (typeof GM_deleteValue !== 'function') {
-            throw new Error('Account Switcher requires a userscript manager with GM storage support.');
+            throw new Error('Account Switcher requires extension storage support.');
         }
         await GM_deleteValue(key);
     }
@@ -14575,7 +14560,7 @@ function setupAccountTransferUI() {
                             <span style="color: #34d399; display: inline-flex; align-items: center; margin-top: 1px; flex-shrink: 0;">${ICONS.shieldCheck || ICONS.shield}</span>
                             <span>
                                 <strong style="color: #f1f5f9;">Strict Privacy Guarantee:</strong> No personal student data, IDs, names, passwords, or session tokens are ever collected or leaked.
-                                <a href="https://github.com/Study-Tool/amaes/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline; margin-left: 4px; font-weight: 600;">Read SECURITY.md</a>
+                                <a href="https://github.com/Study-Tool/database/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline; margin-left: 4px; font-weight: 600;">Read SECURITY.md</a>
                             </span>
                         </div>
                     </div>
@@ -22732,11 +22717,10 @@ function setupAccountTransferUI() {
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 18px;">
                             <!-- Links Grid -->
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
                                 <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
-                                <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
                                 <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.globe} <span>Website</span></a>
-                                <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 600;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
+                                <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 600;" title="Download latest AMAES Toolkit extension package">${ICONS.download} <span>Download</span></button>
                             </div>
 
                             <!-- Utilities Grid -->
@@ -22943,7 +22927,7 @@ function setupAccountTransferUI() {
                 const ok = confirm(
                     "Reset AMAES Toolkit to a brand-new installation?\n\n" +
                     "This clears toolkit settings, cached answer databases, anonymous sharing history, update state, and welcome-page acceptance. " +
-                    "It does not uninstall Violentmonkey or delete Moodle data.\n\n" +
+                    "It does not uninstall the extension or delete Moodle data.\n\n" +
                     "The welcome setup will reopen after reset. Continue?"
                 );
                 if (ok) {
@@ -22955,22 +22939,13 @@ function setupAccountTransferUI() {
         const btnCopyInstallGuide = document.getElementById('btn-copy-install-guide');
         if (btnCopyInstallGuide) {
             btnCopyInstallGuide.onclick = () => {
-                const guideText = `AMAES Moodle Toolkit - Setup & Installation Guide\n\n` +
-                    `Step 1: Install Violentmonkey (Recommended Userscript Manager):\n` +
-                    `• Chrome / Brave: https://chromewebstore.google.com/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag\n` +
-                    `• Firefox: https://addons.mozilla.org/en-US/firefox/addon/violentmonkey/\n` +
-                    `• Edge: https://microsoftedge.microsoft.com/addons/detail/violentmonkey/eeagobfjfgddacbcigncyclcoaebeent\n\n` +
-                    `Step 2 (CRITICAL for Chrome / Brave / Edge / Opera):\n` +
-                    `• Open chrome://extensions (or edge://extensions) in your browser.\n` +
-                    `• Turn ON "Developer mode" in the top-right corner.\n` +
-                    `(Without Developer mode, modern Chromium browsers block all userscripts from running!)\n\n` +
-                    `Step 3: Install the Script:\n` +
-                    `• Direct Install: ${SCRIPT_RAW_URL}\n` +
-                    `• Greasy Fork: ${GREASYFORK_URL}\n` +
-                    `• GitHub Repo: ${GITHUB_REPO_URL}\n` +
-                    `• Violentmonkey will open a tab — click "Confirm installation".\n\n` +
-                    `Step 4: Go to https://semestral.amaes.com/ (e.g. /2612/ or your semester's term path) and log in!\n` +
-                    `The toolkit panel will automatically appear in the bottom-right corner!`;
+                const guideText = `AMAES Toolkit Browser Extension - Setup & Installation Guide\n\n` +
+                    `Step 1: Open the download portal:\n` +
+                    `• Website: ${WEBSITE_URL}\n` +
+                    `• Source Repo: ${GITHUB_REPO_URL}\n\n` +
+                    `Step 2: Download the package for Chrome, Edge, or Firefox and load it in your browser extensions page.\n\n` +
+                    `Step 3: Go to https://semestral.amaes.com/ and log in.\n` +
+                    `The AMAES Toolkit panel will appear in the bottom-right corner.`;
 
                 if (typeof GM_setClipboard !== 'undefined') {
                     GM_setClipboard(guideText);
@@ -23626,7 +23601,7 @@ function setupAccountTransferUI() {
                                 <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
                                 <span>Return to current page after switch</span>
                             </label>
-                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your userscript manager on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
+                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your browser extension storage on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
                             <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
                         `)}
                     </div>
@@ -26360,7 +26335,7 @@ function setupAccountTransferUI() {
                 const ok = confirm(
                     "Reset AMAES Toolkit to a brand-new installation?\n\n" +
                     "This clears toolkit settings, cached answer databases, anonymous sharing history, update state, and welcome-page acceptance. " +
-                    "It does not uninstall Violentmonkey or delete Moodle data.\n\n" +
+                    "It does not uninstall the extension or delete Moodle data.\n\n" +
                     "The welcome setup will reopen after reset. Continue?"
                 );
                 if (ok) {
@@ -26394,7 +26369,7 @@ function setupAccountTransferUI() {
                 if (cachedLatest && isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
                     window.open(SCRIPT_RAW_URL, '_blank');
                 } else {
-                    showToast("Checking GitHub for updates...");
+                    showToast("Checking for AMAES Toolkit updates...");
                     checkForScriptUpdates(true);
                 }
             };

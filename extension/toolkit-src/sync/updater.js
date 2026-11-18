@@ -33,52 +33,22 @@
             localStorage.setItem('amaes_pending_update_time', String(Date.now()));
             localStorage.setItem('amaes_update_in_progress', '1');
         } catch (e) {}
-        showToast(`Opening v${ver} installer... After confirming in Violentmonkey, page will auto-refresh!`, 6500);
+        showToast(`Opening AMAES Toolkit v${ver} download page...`, 5000);
         try {
             window.open(SCRIPT_RAW_URL, '_blank');
         } catch (e) {
             window.location.href = SCRIPT_RAW_URL;
         }
-
-        // Fallback auto-refresh: In case student confirms update without switching focus (e.g. mobile popup), auto-refresh after 6s
-        setTimeout(() => {
-            const pending = localStorage.getItem('amaes_pending_update_install');
-            if (pending && isNewerVersion(pending, SCRIPT_VERSION) && document.visibilityState === 'visible') {
-                sessionStorage.setItem('amaes_update_attempted_reload', '1');
-                showToast(`Update v${ver} detected! Refreshing page to apply...`, 2000);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
-        }, 6000);
     }
 
     function triggerScriptReinstall() {
         const ver = SCRIPT_VERSION;
-        try {
-            localStorage.setItem('amaes_pending_reinstall', '1');
-            localStorage.setItem('amaes_pending_update_time', String(Date.now()));
-            localStorage.setItem('amaes_update_in_progress', '1');
-        } catch (e) {}
-        showToast(`Opening ${ver} in Violentmonkey... After confirming reinstall, page will auto-refresh!`, 6500);
+        showToast(`Opening AMAES Toolkit ${ver} download page...`, 5000);
         try {
             window.open(SCRIPT_RAW_URL, '_blank');
         } catch (e) {
             window.location.href = SCRIPT_RAW_URL;
         }
-
-        // Fallback auto-refresh: In case student confirms reinstall without switching focus (e.g. mobile popup), auto-refresh after 6s
-        setTimeout(() => {
-            const isReinstalling = localStorage.getItem('amaes_pending_reinstall');
-            if (isReinstalling && document.visibilityState === 'visible') {
-                localStorage.removeItem('amaes_pending_reinstall');
-                sessionStorage.setItem('amaes_reinstall_confirmed', '1');
-                showToast(`Reinstall confirmed! Refreshing page...`, 2000);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
-        }, 6000);
     }
 
     function injectTopNavUpdateNotification(latestVersion) {
@@ -132,7 +102,7 @@
                     align-items: center;
                     gap: 5px;
                     line-height: 1.3;
-                " title="Update v${pending} is queued in the userscript manager">
+                " title="Update v${pending} is ready to download">
                     ${ICONS.check} Update v${pending} queued
                 </span>
             `;
@@ -287,16 +257,16 @@
                 const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
                 const elapsed = now - updateTime;
 
-                // Auto-refresh when student returns from confirming in Violentmonkey / script manager
+                // Auto-refresh when student returns after updating the extension
                 if (elapsed >= 1000) {
                     isReloading = true;
                     sessionStorage.setItem('amaes_update_attempted_reload', '1');
-                    showToast(`Update detected! Refreshing page to apply v${pending}...`, 2500);
+                    showToast(`Refreshing page to apply v${pending}...`, 2500);
                     setTimeout(() => {
                         window.location.reload();
                     }, 1000);
                 } else {
-                    showToast(`Update v${pending} is queued in Violentmonkey. It will apply when the userscript manager reloads the script.`, 5000);
+                    showToast(`Download AMAES Toolkit v${pending} from the install page and reload the extension.`, 5000);
                 }
             } catch (e) {}
         };
@@ -335,7 +305,7 @@
             const targetPending = pending ? (pending.startsWith('v') ? pending : `v${pending}`) : '';
             if (pending) {
                 versionPill.innerHTML = `${SCRIPT_VERSION} <span style="font-size: 8px; margin-left: 2px; color: #f59e0b; font-weight: 800;">→ ${targetPending}</span>`;
-                versionPill.title = `Update ${targetPending} is waiting for confirmation in Violentmonkey`;
+                versionPill.title = `Update ${targetPending} is ready to apply`;
                 versionPill.style.borderColor = '#f59e0b';
                 versionPill.style.color = '#f59e0b';
                 versionPill.onclick = () => {

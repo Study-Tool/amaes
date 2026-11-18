@@ -225,11 +225,10 @@
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 18px;">
                             <!-- Links Grid -->
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
                                 <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
-                                <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
                                 <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.globe} <span>Website</span></a>
-                                <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 600;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
+                                <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 600;" title="Download latest AMAES Toolkit extension package">${ICONS.download} <span>Download</span></button>
                             </div>
 
                             <!-- Utilities Grid -->
@@ -436,7 +435,7 @@
                 const ok = confirm(
                     "Reset AMAES Toolkit to a brand-new installation?\n\n" +
                     "This clears toolkit settings, cached answer databases, anonymous sharing history, update state, and welcome-page acceptance. " +
-                    "It does not uninstall Violentmonkey or delete Moodle data.\n\n" +
+                    "It does not uninstall the extension or delete Moodle data.\n\n" +
                     "The welcome setup will reopen after reset. Continue?"
                 );
                 if (ok) {
@@ -448,22 +447,13 @@
         const btnCopyInstallGuide = document.getElementById('btn-copy-install-guide');
         if (btnCopyInstallGuide) {
             btnCopyInstallGuide.onclick = () => {
-                const guideText = `AMAES Moodle Toolkit - Setup & Installation Guide\n\n` +
-                    `Step 1: Install Violentmonkey (Recommended Userscript Manager):\n` +
-                    `• Chrome / Brave: https://chromewebstore.google.com/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag\n` +
-                    `• Firefox: https://addons.mozilla.org/en-US/firefox/addon/violentmonkey/\n` +
-                    `• Edge: https://microsoftedge.microsoft.com/addons/detail/violentmonkey/eeagobfjfgddacbcigncyclcoaebeent\n\n` +
-                    `Step 2 (CRITICAL for Chrome / Brave / Edge / Opera):\n` +
-                    `• Open chrome://extensions (or edge://extensions) in your browser.\n` +
-                    `• Turn ON "Developer mode" in the top-right corner.\n` +
-                    `(Without Developer mode, modern Chromium browsers block all userscripts from running!)\n\n` +
-                    `Step 3: Install the Script:\n` +
-                    `• Direct Install: ${SCRIPT_RAW_URL}\n` +
-                    `• Greasy Fork: ${GREASYFORK_URL}\n` +
-                    `• GitHub Repo: ${GITHUB_REPO_URL}\n` +
-                    `• Violentmonkey will open a tab — click "Confirm installation".\n\n` +
-                    `Step 4: Go to https://semestral.amaes.com/ (e.g. /2612/ or your semester's term path) and log in!\n` +
-                    `The toolkit panel will automatically appear in the bottom-right corner!`;
+                const guideText = `AMAES Toolkit Browser Extension - Setup & Installation Guide\n\n` +
+                    `Step 1: Open the download portal:\n` +
+                    `• Website: ${WEBSITE_URL}\n` +
+                    `• Source Repo: ${GITHUB_REPO_URL}\n\n` +
+                    `Step 2: Download the package for Chrome, Edge, or Firefox and load it in your browser extensions page.\n\n` +
+                    `Step 3: Go to https://semestral.amaes.com/ and log in.\n` +
+                    `The AMAES Toolkit panel will appear in the bottom-right corner.`;
 
                 if (typeof GM_setClipboard !== 'undefined') {
                     GM_setClipboard(guideText);

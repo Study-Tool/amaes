@@ -19,14 +19,23 @@ export interface GmXhrDetails {
 
 export interface GmApi {
   GM_getValue: (key: string, defaultValue?: unknown) => unknown;
-  GM_setValue: (key: string, value: unknown) => void;
-  GM_deleteValue: (key: string) => void;
+  GM_setValue: (key: string, value: unknown) => Promise<void>;
+  GM_deleteValue: (key: string) => Promise<void>;
   GM_setClipboard: (text: string) => void;
   GM_notification: (details: { title?: string; text?: string; image?: string } | string) => void;
   GM_xmlhttpRequest: (details: GmXhrDetails) => void;
 }
 
 const STORAGE_PREFIX = 'gm_';
+
+function decodeBase64ToBlob(base64: string, contentType: string): Blob {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: contentType || 'application/octet-stream' });
+}
 
 export async function createGmApi(): Promise<GmApi> {
   const allStored = await browser.storage.local.get(null);
@@ -47,12 +56,12 @@ export async function createGmApi(): Promise<GmApi> {
 
     GM_setValue(key: string, value: unknown) {
       cache.set(key, value);
-      void browser.storage.local.set({ [key]: value, [`${STORAGE_PREFIX}${key}`]: value });
+      return browser.storage.local.set({ [key]: value, [`${STORAGE_PREFIX}${key}`]: value });
     },
 
     GM_deleteValue(key: string) {
       cache.delete(key);
-      void browser.storage.local.remove([key, `${STORAGE_PREFIX}${key}`]);
+      return browser.storage.local.remove([key, `${STORAGE_PREFIX}${key}`]);
     },
 
     GM_setClipboard(text: string) {
@@ -91,6 +100,8 @@ export async function createGmApi(): Promise<GmApi> {
             status?: number;
             statusText?: string;
             responseText?: string;
+            responseBase64?: string;
+            contentType?: string;
             responseHeaders?: string;
             finalUrl?: string;
             error?: string;
@@ -107,11 +118,15 @@ export async function createGmApi(): Promise<GmApi> {
             });
             return;
           }
+          const responsePayload =
+            details.responseType === 'blob' && typeof r.responseBase64 === 'string'
+              ? decodeBase64ToBlob(r.responseBase64, r.contentType || '')
+              : (r.responseText ?? '');
           details.onload?.({
             status: r.status ?? 0,
             statusText: r.statusText ?? '',
             responseText: r.responseText ?? '',
-            response: r.responseText ?? '',
+            response: responsePayload,
             responseHeaders: r.responseHeaders ?? '',
             finalUrl: r.finalUrl ?? details.url,
           });

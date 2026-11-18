@@ -7,21 +7,21 @@
 
     async function getAccountSwitcherValue(key, fallbackValue = null) {
         if (typeof GM_getValue !== 'function') {
-            throw new Error('Account Switcher requires a userscript manager with GM storage support.');
+            throw new Error('Account Switcher requires extension storage support.');
         }
         return await GM_getValue(key, fallbackValue);
     }
 
     async function setAccountSwitcherValue(key, value) {
         if (typeof GM_setValue !== 'function') {
-            throw new Error('Account Switcher requires a userscript manager with GM storage support.');
+            throw new Error('Account Switcher requires extension storage support.');
         }
         await GM_setValue(key, value);
     }
 
     async function deleteAccountSwitcherValue(key) {
         if (typeof GM_deleteValue !== 'function') {
-            throw new Error('Account Switcher requires a userscript manager with GM storage support.');
+            throw new Error('Account Switcher requires extension storage support.');
         }
         await GM_deleteValue(key);
     }
