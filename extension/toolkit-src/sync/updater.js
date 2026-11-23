@@ -22,6 +22,168 @@
         return match ? `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}` : null;
     }
 
+    function getExtensionUpdateGuide() {
+        const ua = (navigator.userAgent || '').toLowerCase();
+        if (ua.includes('firefox')) {
+            return {
+                browserLabel: 'Firefox',
+                extUrl: 'about:debugging#/runtime/this-firefox',
+                steps: [
+                    'Click Open Download Page below and save the new Firefox .zip file.',
+                    'Extract the files directly into your existing AMAES folder (where manifest.json lives) and replace all files.',
+                    'Open about:debugging#/runtime/this-firefox and click Reload (or Load Temporary Add-on and pick manifest.json).'
+                ]
+            };
+        }
+        const isEdge = ua.includes('edg/');
+        const extUrl = isEdge ? 'edge://extensions' : 'chrome://extensions';
+        return {
+            browserLabel: isEdge ? 'Microsoft Edge' : 'Chrome / Brave',
+            extUrl,
+            steps: [
+                'Click Open Download Page below and download the new .zip file.',
+                'Extract the files directly into your existing AMAES folder (where manifest.json lives) and replace all files so your settings and Gemini keys stay saved.',
+                `Open ${extUrl} and click the Reload button on AMAES Toolkit, then click Refresh This Page below.`
+            ]
+        };
+    }
+
+    function showExtensionUpdateModal(targetVersion, isReinstall = false) {
+        if (!document.body) return;
+        document.getElementById('amaes-update-guide-modal')?.remove();
+
+        const ver = normalizeVersion(targetVersion) || SCRIPT_VERSION.replace(/^v/i, '');
+        const guide = getExtensionUpdateGuide();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'amaes-update-guide-modal';
+        overlay.style.cssText = [
+            'position: fixed',
+            'inset: 0',
+            'z-index: 9999999',
+            'background: rgba(2, 6, 23, 0.72)',
+            'backdrop-filter: blur(4px)',
+            'display: flex',
+            'align-items: center',
+            'justify-content: center',
+            'padding: 16px',
+            'font-family: system-ui, -apple-system, sans-serif'
+        ].join(';');
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = [
+            'width: 100%',
+            'max-width: 440px',
+            'background: #0f172a',
+            'color: #f8fafc',
+            'border: 1px solid rgba(16, 185, 129, 0.45)',
+            'border-radius: 12px',
+            'box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5)',
+            'padding: 18px 20px',
+            'display: flex',
+            'flex-direction: column',
+            'gap: 12px'
+        ].join(';');
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:12px;';
+
+        const titleWrap = document.createElement('div');
+        const kicker = document.createElement('div');
+        kicker.textContent = isReinstall ? 'EXTENSION REINSTALL GUIDE' : 'TOOLKIT UPDATE AVAILABLE';
+        kicker.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:0.06em;color:#6ee7b7;margin-bottom:3px;';
+        const heading = document.createElement('h3');
+        heading.textContent = isReinstall
+            ? `Reinstall AMAES Toolkit (${SCRIPT_VERSION})`
+            : `Update to v${ver} (Installed: ${SCRIPT_VERSION})`;
+        heading.style.cssText = 'margin:0;font-size:16px;font-weight:700;color:#ffffff;';
+        titleWrap.appendChild(kicker);
+        titleWrap.appendChild(heading);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.textContent = 'Close';
+        closeBtn.style.cssText = 'background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;';
+
+        header.appendChild(titleWrap);
+        header.appendChild(closeBtn);
+
+        const intro = document.createElement('p');
+        intro.textContent = `${guide.browserLabel}: Follow these 3 quick steps to update without losing your settings:`;
+        intro.style.cssText = 'margin:0;font-size:13px;color:#cbd5e1;line-height:1.45;';
+
+        const list = document.createElement('ol');
+        list.style.cssText = 'margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.45;color:#e2e8f0;';
+        guide.steps.forEach((step) => {
+            const li = document.createElement('li');
+            li.textContent = step;
+            list.appendChild(li);
+        });
+
+        const urlBar = document.createElement('div');
+        urlBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:8px;background:#1e293b;border:1px solid #334155;';
+        const urlCode = document.createElement('code');
+        urlCode.textContent = guide.extUrl;
+        urlCode.style.cssText = 'font-size:12px;color:#93c5fd;word-break:break-all;';
+        const copyUrlBtn = document.createElement('button');
+        copyUrlBtn.type = 'button';
+        copyUrlBtn.textContent = 'Copy URL';
+        copyUrlBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;';
+        copyUrlBtn.onclick = () => {
+            try {
+                if (typeof GM_setClipboard === 'function') {
+                    GM_setClipboard(guide.extUrl);
+                } else if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(guide.extUrl).catch(() => {});
+                }
+                copyUrlBtn.textContent = 'Copied!';
+                setTimeout(() => { copyUrlBtn.textContent = 'Copy URL'; }, 2500);
+            } catch (_) {}
+        };
+        urlBar.appendChild(urlCode);
+        urlBar.appendChild(copyUrlBtn);
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:2px;';
+
+        const downloadBtn = document.createElement('a');
+        downloadBtn.href = SCRIPT_RAW_URL;
+        downloadBtn.target = '_blank';
+        downloadBtn.rel = 'noopener noreferrer';
+        downloadBtn.textContent = `Open Download Page (v${ver})`;
+        downloadBtn.style.cssText = 'flex:1 1 180px;text-align:center;background:#059669;color:#ffffff;text-decoration:none;border-radius:7px;padding:9px 12px;font-size:13px;font-weight:700;';
+
+        const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.textContent = 'Refresh This Page';
+        refreshBtn.style.cssText = 'flex:1 1 140px;background:#1e293b;color:#f8fafc;border:1px solid #475569;border-radius:7px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;';
+        refreshBtn.onclick = () => window.location.reload();
+
+        actions.appendChild(downloadBtn);
+        actions.appendChild(refreshBtn);
+
+        dialog.appendChild(header);
+        dialog.appendChild(intro);
+        dialog.appendChild(list);
+        dialog.appendChild(urlBar);
+        dialog.appendChild(actions);
+        overlay.appendChild(dialog);
+
+        const closeModal = () => {
+            document.removeEventListener('keydown', onEscape);
+            overlay.remove();
+        };
+        const onEscape = (e) => {
+            if (e.key === 'Escape') closeModal();
+        };
+        closeBtn.onclick = closeModal;
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeModal();
+        });
+        document.addEventListener('keydown', onEscape);
+        document.body.appendChild(overlay);
+    }
+
     function triggerScriptUpdate(targetVersion) {
         const ver = normalizeVersion(targetVersion);
         if (!ver || !isNewerVersion(ver, SCRIPT_VERSION)) {
@@ -29,26 +191,15 @@
             return;
         }
         try {
-            localStorage.setItem('amaes_pending_update_install', ver);
-            localStorage.setItem('amaes_pending_update_time', String(Date.now()));
-            localStorage.setItem('amaes_update_in_progress', '1');
+            localStorage.removeItem('amaes_pending_update_install');
+            localStorage.removeItem('amaes_pending_update_time');
+            localStorage.removeItem('amaes_update_in_progress');
         } catch (e) {}
-        showToast(`Opening AMAES Toolkit v${ver} download page...`, 5000);
-        try {
-            window.open(SCRIPT_RAW_URL, '_blank');
-        } catch (e) {
-            window.location.href = SCRIPT_RAW_URL;
-        }
+        showExtensionUpdateModal(ver, false);
     }
 
     function triggerScriptReinstall() {
-        const ver = SCRIPT_VERSION;
-        showToast(`Opening AMAES Toolkit ${ver} download page...`, 5000);
-        try {
-            window.open(SCRIPT_RAW_URL, '_blank');
-        } catch (e) {
-            window.location.href = SCRIPT_RAW_URL;
-        }
+        showExtensionUpdateModal(SCRIPT_VERSION, true);
     }
 
     function injectTopNavUpdateNotification(latestVersion) {
@@ -123,7 +274,7 @@
                     cursor: pointer;
                     line-height: 1.3;
                     white-space: nowrap;
-                " title="New version v${latestVersion} available! Click to open update in script manager">
+                " title="New version v${latestVersion} available! Click to view update steps">
                     ${ICONS.download} Update Toolkit (v${latestVersion})
                 </button>
             `;
@@ -418,21 +569,12 @@
         // 6. Welcome Guide Modal Update Status
         const welcomeUpdateNow = document.getElementById('btn-welcome-update-now');
         if (welcomeUpdateNow) {
-            const pending = localStorage.getItem('amaes_pending_update_install');
-            if (pending) {
-                welcomeUpdateNow.innerHTML = `${ICONS.check} <span>Update Queued</span>`;
-                welcomeUpdateNow.disabled = true;
-                welcomeUpdateNow.onclick = null;
-            } else {
-                welcomeUpdateNow.innerHTML = `${ICONS.download} <span>Update Now (v${latestVersion})</span>`;
-                welcomeUpdateNow.onclick = (e) => {
-                    e.preventDefault();
-                    triggerScriptUpdate(latestVersion);
-                    welcomeUpdateNow.innerHTML = `${ICONS.check} <span>Update Queued</span>`;
-                    welcomeUpdateNow.disabled = true;
-                    welcomeUpdateNow.onclick = null;
-                };
-            }
+            welcomeUpdateNow.disabled = false;
+            welcomeUpdateNow.innerHTML = `${ICONS.download} <span>Update Now (v${latestVersion})</span>`;
+            welcomeUpdateNow.onclick = (e) => {
+                e.preventDefault();
+                triggerScriptUpdate(latestVersion);
+            };
         }
 
         // 7. Quiz Floating HUD Update Button
@@ -470,7 +612,7 @@
         }
 
         if (manual) {
-            setLog("Auto-checking GitHub for toolkit updates...", "var(--accent-blue)", "Querying releases...");
+            setLog("Checking update server for toolkit updates...", "var(--accent-blue)", "Querying config...");
         }
 
         const req = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :

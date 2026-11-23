@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 describe('toolkit-bundle', () => {
-  it('contains zero legacy Acads-Tools/amaestoolkit/GreasyFork references and uses Cloudflare v0.1.2 endpoints', () => {
+  it('contains zero legacy Acads-Tools/amaestoolkit/GreasyFork references and uses Cloudflare v0.1.3 endpoints', () => {
     const bundlePath = path.resolve(import.meta.dirname, '..', 'utils', 'toolkit-bundle.js');
     const code = fs.readFileSync(bundlePath, 'utf8');
 
-    expect(code).toContain('const SCRIPT_VERSION = "v0.1.2";');
+    expect(code).toContain('const SCRIPT_VERSION = "v0.1.3";');
     expect(code).toContain('https://amaes-community-relay.study-tool-amaes-relay.workers.dev');
     expect(code).toContain('https://study-tool-amaes.pages.dev/');
     expect(code).toContain('/v1/config?_t=');
@@ -59,7 +59,7 @@ describe('toolkit-bundle', () => {
       GM_xmlhttpRequest: () => {},
     });
 
-    expect(attrs['data-amaes-toolkit-version']).toBe('0.1.2');
+    expect(attrs['data-amaes-toolkit-version']).toBe('0.1.3');
     expect(events).toContain('amaes-toolkit-detected');
     vi.unstubAllGlobals();
   });

@@ -611,7 +611,26 @@ footer a { color: #d8b4fe; }
 .inline-update-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  flex: 1 1 240px;
+}
+
+.inline-update-steps {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.inline-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
 }
 
 .inline-update-btn {

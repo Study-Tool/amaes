@@ -50,7 +50,7 @@ raw = raw.replace(/\}\)\(\);\s*$/, '');
 
 // Rewrite legacy URLs, version, and portal detection for the Study-Tool + Cloudflare deployment.
 raw = raw
-  .replace(/const SCRIPT_VERSION = "[^"]+";/, 'const SCRIPT_VERSION = "v0.1.2";')
+  .replace(/const SCRIPT_VERSION = "[^"]+";/, 'const SCRIPT_VERSION = "v0.1.3";')
   .replace(/https:\/\/amaes-community-relay\.acads-tools\.workers\.dev/g, RELAY_URL)
   .replace(/https:\/\/raw\.githubusercontent\.com\/Acads-Tools\/database\//g, 'https://raw.githubusercontent.com/Study-Tool/database/')
   .replace(/https:\/\/raw\.githubusercontent\.com\/Acads-Tools\/amaes-toolkit\/main\/amaes-toolkit\.user\.js/g, `${PORTAL_URL}#install-step`)

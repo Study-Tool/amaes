@@ -29,7 +29,7 @@ export const CONFIG_TTL_MS = 6 * 60 * 60 * 1000;
 
 export const DEFAULT_REMOTE_CONFIG: RemoteConfig = {
   minVersion: '0.1.0',
-  latestVersion: '0.1.2',
+  latestVersion: '0.1.3',
   links: {
     homepage: 'https://study-tool-amaes.pages.dev/',
     support: 'https://github.com/Study-Tool/amaes/issues',
@@ -58,6 +58,65 @@ function isValidConfig(value: unknown): value is RemoteConfig {
       typeof candidate.links.homepage === 'string' &&
       typeof candidate.links.support === 'string',
   );
+}
+
+export interface BrowserUpdateGuide {
+  browserLabel: string;
+  extensionsUrl: string;
+  steps: string[];
+}
+
+/** Parse a `vX.Y.Z` or `X.Y.Z` version string into `[major, minor, patch]`. */
+export function parseSemver(version: string): [number, number, number] | null {
+  const match = String(version || '')
+    .trim()
+    .replace(/^v/i, '')
+    .match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+/** Compare two semver strings (`1` if `left > right`, `-1` if `left < right`, `0` if equal, `null` if invalid). */
+export function compareSemver(left: string, right: string): number | null {
+  const a = parseSemver(left);
+  const b = parseSemver(right);
+  if (!a || !b) return null;
+  for (let i = 0; i < 3; i += 1) {
+    if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1;
+  }
+  return 0;
+}
+
+/** Return true when `latestVersion` is strictly newer than `installedVersion`. */
+export function isUpdateAvailable(installedVersion: string, latestVersion: string): boolean {
+  return compareSemver(latestVersion, installedVersion) === 1;
+}
+
+/** Return browser-specific sideloaded extension update steps and extensions page URL. */
+export function getBrowserUpdateGuide(userAgent = ''): BrowserUpdateGuide {
+  const ua = userAgent.toLowerCase();
+  if (ua.includes('firefox')) {
+    return {
+      browserLabel: 'Firefox',
+      extensionsUrl: 'about:debugging#/runtime/this-firefox',
+      steps: [
+        'Click Download Update to save the latest Firefox .zip file.',
+        'Extract the files directly into your existing AMAES folder (where manifest.json lives) and replace all files.',
+        'Open about:debugging#/runtime/this-firefox and click Reload (or Load Temporary Add-on -> manifest.json).',
+      ],
+    };
+  }
+  const isEdge = ua.includes('edg/');
+  const extensionsUrl = isEdge ? 'edge://extensions' : 'chrome://extensions';
+  return {
+    browserLabel: isEdge ? 'Microsoft Edge' : 'Chrome / Chromium',
+    extensionsUrl,
+    steps: [
+      'Click Download Update to save the latest .zip file.',
+      'Extract the files directly into your existing AMAES folder (where manifest.json lives) and replace all files so settings stay saved.',
+      `Open ${extensionsUrl} and click Reload on AMAES Toolkit.`,
+    ],
+  };
 }
 
 export async function getDynamicConfig(

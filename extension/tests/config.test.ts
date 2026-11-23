@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   CONFIG_CACHE_KEY,
   DEFAULT_REMOTE_CONFIG,
+  getBrowserUpdateGuide,
   getDynamicConfig,
+  isUpdateAvailable,
   type StorageLike,
 } from '../utils/config';
 
@@ -78,5 +80,26 @@ describe('getDynamicConfig', () => {
 
     const result = await getDynamicConfig(storage, failingFetch, 999_999_999);
     expect(result.links.repo).toBe('https://stale-mirror.example/repo');
+  });
+});
+
+describe('update helpers', () => {
+  it('compares semver versions accurately', () => {
+    expect(isUpdateAvailable('0.1.2', '0.1.3')).toBe(true);
+    expect(isUpdateAvailable('0.1.2', 'v0.2.0')).toBe(true);
+    expect(isUpdateAvailable('0.1.2', '0.1.2')).toBe(false);
+    expect(isUpdateAvailable('0.1.2', '0.1.1')).toBe(false);
+  });
+
+  it('returns browser-specific update instructions and extensions URLs', () => {
+    const chrome = getBrowserUpdateGuide('Mozilla/5.0 Chrome/130.0.0.0 Safari/537.36');
+    expect(chrome.extensionsUrl).toBe('chrome://extensions');
+    expect(chrome.steps.length).toBe(3);
+
+    const edge = getBrowserUpdateGuide('Mozilla/5.0 Chrome/130.0.0.0 Edg/130.0.0.0');
+    expect(edge.extensionsUrl).toBe('edge://extensions');
+
+    const firefox = getBrowserUpdateGuide('Mozilla/5.0 Gecko/20100101 Firefox/132.0');
+    expect(firefox.extensionsUrl).toBe('about:debugging#/runtime/this-firefox');
   });
 });

@@ -2,7 +2,7 @@
   'use strict';
 
   const RELAY_BASE_URL = 'https://amaes-community-relay.study-tool-amaes-relay.workers.dev';
-  let latestVersion = '0.1.2';
+  let latestVersion = '0.1.3';
 
   function getDownloadMeta(browser, version) {
     const cleanVer = String(version || '0.1.0').replace(/^v/i, '');
@@ -74,6 +74,8 @@
   const inlineUpdateBanner = document.getElementById('inline-update-banner');
   const inlineUpdateTitle = document.getElementById('inline-update-title');
   const inlineUpdateBtn = document.getElementById('inline-update-btn');
+  const inlineUpdateSteps = document.getElementById('inline-update-steps');
+  const inlineCopyExtBtn = document.getElementById('inline-copy-ext-btn');
 
   let detectedVersion = null;
   let activeBrowser = 'chrome';
@@ -114,6 +116,15 @@
           inlineUpdateBtn.href = cfg.href;
           inlineUpdateBtn.setAttribute('download', cfg.filename);
           inlineUpdateBtn.textContent = `Download v${latestVersion}`;
+        }
+        if (inlineUpdateSteps) {
+          const isFx = activeBrowser === 'firefox';
+          inlineUpdateSteps.innerHTML = isFx
+            ? `<li>Click <strong>Download v${latestVersion}</strong> below.</li><li>Extract the files directly into your existing AMAES folder (where <code>manifest.json</code> lives) and replace all files.</li><li>Open <code>${cfg.extPage}</code> and click <strong>Reload</strong> (or <strong>Load Temporary Add-on</strong> &rarr; <code>manifest.json</code>).</li>`
+            : `<li>Click <strong>Download v${latestVersion}</strong> below.</li><li>Extract the files directly into your existing AMAES folder (where <code>manifest.json</code> lives) and replace all files so settings stay saved.</li><li>Open <code>${cfg.extPage}</code> and click <strong>Reload</strong> on AMAES Toolkit.</li>`;
+        }
+        if (inlineCopyExtBtn) {
+          inlineCopyExtBtn.textContent = `Copy ${cfg.extPage}`;
         }
         inlineUpdateBanner.hidden = false;
       }
@@ -181,6 +192,8 @@
     if (extPageUrlEl) extPageUrlEl.textContent = cfg.extPage;
     if (copyExtUrlFeedback) copyExtUrlFeedback.textContent = '';
     if (browserLoadText) browserLoadText.innerHTML = cfg.steps;
+    if (inlineCopyExtBtn) inlineCopyExtBtn.textContent = `Copy ${cfg.extPage}`;
+    renderVersionStatus();
   }
 
   const ua = navigator.userAgent.toLowerCase();
@@ -200,15 +213,10 @@
   chooseBrowser(detectedBrowser);
 
   if (copyExtUrlBtn && extPageUrlEl) {
-    copyExtUrlBtn.addEventListener('click', function () {
+    const copyCurrentExtUrl = function (onDone) {
       const targetUrl = extPageUrlEl.textContent.trim();
-      const showCopied = function () {
-        if (copyExtUrlFeedback) {
-          copyExtUrlFeedback.textContent = 'Copied! Paste in address bar (Ctrl+L, Ctrl+V, Enter)';
-        }
-      };
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(targetUrl).then(showCopied).catch(function () {});
+        navigator.clipboard.writeText(targetUrl).then(onDone).catch(function () {});
       } else {
         const tmp = document.createElement('textarea');
         tmp.value = targetUrl;
@@ -218,9 +226,27 @@
         tmp.select();
         document.execCommand('copy');
         tmp.remove();
-        showCopied();
+        onDone();
       }
+    };
+    copyExtUrlBtn.addEventListener('click', function () {
+      copyCurrentExtUrl(function () {
+        if (copyExtUrlFeedback) {
+          copyExtUrlFeedback.textContent = 'Copied! Paste in address bar (Ctrl+L, Ctrl+V, Enter)';
+        }
+      });
     });
+    if (inlineCopyExtBtn) {
+      inlineCopyExtBtn.addEventListener('click', function () {
+        copyCurrentExtUrl(function () {
+          inlineCopyExtBtn.textContent = 'Copied!';
+          setTimeout(function () {
+            const cfg = getDownloadMeta(activeBrowser, latestVersion);
+            inlineCopyExtBtn.textContent = `Copy ${cfg.extPage}`;
+          }, 2000);
+        });
+      });
+    }
   }
 
   const checkButton = document.getElementById('check-button');

@@ -10,7 +10,7 @@
     <main class="popup-root">
       <header class="popup-header">
         <h1>AMAES Toolkit</h1>
-        <span id="version-badge" class="badge">v0.1.2</span>
+        <span id="version-badge" class="badge">v0.1.3</span>
       </header>
 
       <p class="subtitle">
@@ -18,6 +18,22 @@
       </p>
 
       <div id="announcement-box" class="announcement hidden"></div>
+
+      <section id="update-card" class="update-card hidden" aria-live="polite">
+        <div class="update-card-header">
+          <strong id="update-card-title">Update Available</strong>
+          <span id="update-card-version" class="update-badge">v0.1.3</span>
+        </div>
+        <p id="update-card-subtitle" class="update-subtitle">
+          How to update without losing your settings:
+        </p>
+        <ol id="update-steps-list" class="update-steps"></ol>
+        <div class="update-actions">
+          <a id="update-download-link" class="btn-primary" href="https://study-tool-amaes.pages.dev/#install-step" target="_blank" rel="noopener noreferrer">Download Update</a>
+          <button id="copy-ext-url-btn" class="btn-secondary" type="button">Copy Extensions URL</button>
+        </div>
+        <div id="copy-ext-feedback" class="copy-feedback hidden"></div>
+      </section>
 
       <nav class="links-grid" aria-label="Toolkit Links">
         <a id="link-homepage" href="https://study-tool-amaes.pages.dev/" target="_blank" rel="noopener noreferrer">Website</a>
