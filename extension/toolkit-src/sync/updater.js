@@ -205,19 +205,7 @@
     function injectTopNavUpdateNotification(latestVersion) {
         if (!latestVersion || !isNewerVersion(latestVersion, SCRIPT_VERSION)) return;
 
-        const pendingRaw = localStorage.getItem('amaes_pending_update_install');
-        const pending = pendingRaw && isNewerVersion(pendingRaw, SCRIPT_VERSION) ? pendingRaw : null;
-        if (pendingRaw && !pending) {
-            localStorage.removeItem('amaes_pending_update_install');
-            localStorage.removeItem('amaes_pending_update_time');
-            localStorage.removeItem('amaes_update_in_progress');
-        }
         const existing = document.getElementById('amaes-topnav-update-item');
-        if (pending) {
-            if (existing) existing.remove();
-            return;
-        }
-
         if (existing) {
             existing.remove();
         }
@@ -239,46 +227,26 @@
             vertical-align: middle;
         `;
 
-        if (pending) {
-            wrap.innerHTML = `
-                <span class="btn btn-sm" style="
-                    background: rgba(16, 185, 129, 0.16);
-                    color: #a7f3d0 !important;
-                    font-weight: 700;
-                    font-size: 11px;
-                    padding: 3px 11px;
-                    border-radius: 20px;
-                    border: 1px solid rgba(16, 185, 129, 0.45);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 5px;
-                    line-height: 1.3;
-                " title="Update v${pending} is ready to download">
-                    ${ICONS.check} Update v${pending} queued
-                </span>
-            `;
-        } else {
-            wrap.innerHTML = `
-                <button id="amaes-topnav-update-btn" type="button" class="btn btn-sm" style="
-                    background: linear-gradient(135deg, #10b981, #059669);
-                    color: #ffffff !important;
-                    font-weight: 700;
-                    font-size: 11px;
-                    padding: 3px 11px;
-                    border-radius: 20px;
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.3);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 5px;
-                    cursor: pointer;
-                    line-height: 1.3;
-                    white-space: nowrap;
-                " title="New version v${latestVersion} available! Click to view update steps">
-                    ${ICONS.download} Update Toolkit (v${latestVersion})
-                </button>
-            `;
-        }
+        wrap.innerHTML = `
+            <button id="amaes-topnav-update-btn" type="button" class="btn btn-sm" style="
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: #ffffff !important;
+                font-weight: 700;
+                font-size: 11px;
+                padding: 3px 11px;
+                border-radius: 20px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                box-shadow: 0 1px 4px rgba(16, 185, 129, 0.3);
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                cursor: pointer;
+                line-height: 1.3;
+                white-space: nowrap;
+            " title="New version v${latestVersion} available! Click to view update steps">
+                ${ICONS.download} Update Toolkit (v${latestVersion})
+            </button>
+        `;
 
         const updateBtn = wrap.querySelector('#amaes-topnav-update-btn');
         if (updateBtn) {
@@ -286,7 +254,6 @@
                 e.preventDefault();
                 e.stopPropagation();
                 triggerScriptUpdate(latestVersion);
-                injectTopNavUpdateNotification(latestVersion);
             };
         }
 
@@ -297,155 +264,51 @@
         }
     }
 
+    function clearLegacyUpdateFlags() {
+        localStorage.removeItem('amaes_pending_update_install');
+        localStorage.removeItem('amaes_pending_update_time');
+        localStorage.removeItem('amaes_pending_reinstall');
+        localStorage.removeItem('amaes_update_in_progress');
+        sessionStorage.removeItem('amaes_update_attempted_reload');
+        sessionStorage.removeItem('amaes_reinstall_confirmed');
+    }
+
     function checkPendingUpdateInstallation() {
         try {
-            const pending = localStorage.getItem('amaes_pending_update_install');
             const lastSeen = localStorage.getItem('amaes_last_seen_version');
+            clearLegacyUpdateFlags();
 
-            if (pending && !isNewerVersion(pending, SCRIPT_VERSION)) {
-                localStorage.removeItem('amaes_pending_update_install');
-                localStorage.removeItem('amaes_pending_update_time');
-                localStorage.removeItem('amaes_update_in_progress');
-                sessionStorage.removeItem('amaes_update_attempted_reload');
+            const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
+            if (cachedLatest && !isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
+                localStorage.removeItem('amaes_latest_version_seen');
+            }
 
-                const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
-                if (cachedLatest && !isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
-                    localStorage.removeItem('amaes_latest_version_seen');
-                }
-
-                setTimeout(() => {
-                    showToast(`Toolkit successfully updated to ${SCRIPT_VERSION}!`, 5000);
-                    setLog(`Toolkit successfully updated to <b>${SCRIPT_VERSION}</b>. All features active.`, "var(--accent-green)");
-                }, 600);
-            } else if (pending && isNewerVersion(pending, SCRIPT_VERSION)) {
-                const reloadAttempted = sessionStorage.getItem('amaes_update_attempted_reload');
-                const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
-                const expired = updateTime && (Date.now() - updateTime > 90000);
-
-                if (reloadAttempted || expired) {
-                    sessionStorage.removeItem('amaes_update_attempted_reload');
-                    localStorage.removeItem('amaes_pending_update_install');
-                    localStorage.removeItem('amaes_pending_update_time');
-                    localStorage.removeItem('amaes_update_in_progress');
-                    if (reloadAttempted) {
-                        setTimeout(() => {
-                            showToast(`Update v${pending} was not installed yet. Click Update Now to try again.`, 5000);
-                        }, 600);
-                    }
-                }
-            } else if (lastSeen && isNewerVersion(SCRIPT_VERSION, lastSeen)) {
-                const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
-                if (cachedLatest && !isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
-                    localStorage.removeItem('amaes_latest_version_seen');
-                }
-
+            if (lastSeen && isNewerVersion(SCRIPT_VERSION, lastSeen)) {
                 setTimeout(() => {
                     showToast(`Toolkit updated to ${SCRIPT_VERSION}!`, 4500);
                     setLog(`Toolkit updated to <b>${SCRIPT_VERSION}</b>.`, "var(--accent-green)");
                 }, 600);
             }
 
-            if (sessionStorage.getItem('amaes_reinstall_confirmed')) {
-                sessionStorage.removeItem('amaes_reinstall_confirmed');
-                setTimeout(() => {
-                    showToast(`Toolkit successfully reinstalled (${SCRIPT_VERSION})!`, 5000);
-                    setLog(`Toolkit successfully reinstalled (<b>${SCRIPT_VERSION}</b>).`, "var(--accent-green)");
-                }, 600);
-            }
-
             localStorage.setItem('amaes_last_seen_version', SCRIPT_VERSION);
         } catch (e) {
-            logDebug(`Error checking pending update: ${e.message}`);
+            logDebug(`Error checking update version state: ${e.message}`);
         }
     }
 
     function setupPendingUpdateFocusListener() {
-        let lastFocusPrompt = 0;
-        let isReloading = false;
-        const handleReturnFocus = () => {
-            try {
-                if (isReloading) return;
-
-                const isReinstalling = localStorage.getItem('amaes_pending_reinstall');
-                if (isReinstalling) {
-                    const now = Date.now();
-                    const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
-                    const elapsed = now - updateTime;
-
-                    if (elapsed >= 1000) {
-                        isReloading = true;
-                        localStorage.removeItem('amaes_pending_reinstall');
-                        sessionStorage.setItem('amaes_reinstall_confirmed', '1');
-                        showToast(`Reinstall detected! Refreshing page to apply...`, 2500);
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                        return;
-                    }
-                }
-
-                const pendingRaw = localStorage.getItem('amaes_pending_update_install');
-                const pending = pendingRaw && isNewerVersion(pendingRaw, SCRIPT_VERSION) ? pendingRaw : null;
-                const latestKnown = normalizeVersion(localStorage.getItem('amaes_latest_version_seen'));
-
-                if (!pending || (latestKnown && isNewerVersion(latestKnown, pending))) {
-                    if (pending && latestKnown && isNewerVersion(latestKnown, pending)) {
-                        localStorage.removeItem('amaes_pending_update_install');
-                        localStorage.removeItem('amaes_pending_update_time');
-                    }
-                    return;
-                }
-
-                if (!isNewerVersion(pending, SCRIPT_VERSION)) {
-                    localStorage.removeItem('amaes_pending_update_install');
-                    return;
-                }
-
-                const now = Date.now();
-                if (now - lastFocusPrompt < 2000) return;
-                lastFocusPrompt = now;
-
-                const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
-                const elapsed = now - updateTime;
-
-                // Auto-refresh when student returns after updating the extension
-                if (elapsed >= 1000) {
-                    isReloading = true;
-                    sessionStorage.setItem('amaes_update_attempted_reload', '1');
-                    showToast(`Refreshing page to apply v${pending}...`, 2500);
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                } else {
-                    showToast(`Download AMAES Toolkit v${pending} from the install page and reload the extension.`, 5000);
-                }
-            } catch (e) {}
-        };
-
-        window.addEventListener('focus', handleReturnFocus);
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                handleReturnFocus();
-            }
-        });
+        try {
+            clearLegacyUpdateFlags();
+        } catch (_) {}
     }
 
     function renderUpdateNotice(latestVersion) {
-        const pendingRaw = localStorage.getItem('amaes_pending_update_install');
-        const pending = pendingRaw &&
-            isNewerVersion(pendingRaw, SCRIPT_VERSION) &&
-            !isNewerVersion(latestVersion, pendingRaw) ? pendingRaw : null;
-        if (pendingRaw && !pending) {
-            localStorage.removeItem('amaes_pending_update_install');
-            localStorage.removeItem('amaes_pending_update_time');
-        }
-
         // 1. Persistent Header "Update Now" Button
         const titleGroup = document.getElementById('amaes-title-group');
         if (titleGroup) {
-            let headerUpdateBtn = document.getElementById('amaes-header-update-btn');
+            const headerUpdateBtn = document.getElementById('amaes-header-update-btn');
             if (headerUpdateBtn) {
-                headerUpdateBtn.remove(); // Keep header clean and prevent overlapping action icons
+                headerUpdateBtn.remove();
             }
         }
 
@@ -453,23 +316,11 @@
         const versionPill = document.getElementById('amaes-version-pill');
         if (versionPill) {
             const targetVer = latestVersion.startsWith('v') ? latestVersion : `v${latestVersion}`;
-            const targetPending = pending ? (pending.startsWith('v') ? pending : `v${pending}`) : '';
-            if (pending) {
-                versionPill.innerHTML = `${SCRIPT_VERSION} <span style="font-size: 8px; margin-left: 2px; color: #f59e0b; font-weight: 800;">→ ${targetPending}</span>`;
-                versionPill.title = `Update ${targetPending} is ready to apply`;
-                versionPill.style.borderColor = '#f59e0b';
-                versionPill.style.color = '#f59e0b';
-                versionPill.onclick = () => {
-                    sessionStorage.setItem('amaes_update_attempted_reload', '1');
-                    window.location.reload();
-                };
-            } else {
-                versionPill.innerHTML = `${SCRIPT_VERSION} <span style="display: inline-flex; align-items: center; background: #10b981; color: #fff; padding: 0 4px; border-radius: 3px; font-size: 8px; margin-left: 2px; font-weight: 800; letter-spacing: 0; white-space: nowrap;">→ ${targetVer}</span>`;
-                versionPill.title = `Update available: ${targetVer}. Click to install`;
-                versionPill.style.borderColor = '#10b981';
-                versionPill.style.color = '#10b981';
-                versionPill.onclick = () => triggerScriptUpdate(latestVersion);
-            }
+            versionPill.innerHTML = `${SCRIPT_VERSION} <span style="display: inline-flex; align-items: center; background: #10b981; color: #fff; padding: 0 4px; border-radius: 3px; font-size: 8px; margin-left: 2px; font-weight: 800; letter-spacing: 0; white-space: nowrap;">-> ${targetVer}</span>`;
+            versionPill.title = `Update available: ${targetVer}. Click for update steps`;
+            versionPill.style.borderColor = '#10b981';
+            versionPill.style.color = '#10b981';
+            versionPill.onclick = () => triggerScriptUpdate(latestVersion);
         }
 
         // 3. Top-Right Persistent Notification Area Update Item
@@ -478,88 +329,52 @@
         // 5. Persistent Banner in Panel Body
         const container = document.getElementById('amaes-update-container');
         if (container) {
-            if (pending) {
-                container.innerHTML = `
-                    <div id="amaes-update-banner" style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        gap: 8px;
-                        padding: 6px 10px;
-                        background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.25));
-                        border: 1px solid rgba(16, 185, 129, 0.5);
-                        border-radius: 6px;
-                        margin-bottom: 8px;
-                        font-size: 11px;
-                        animation: amaesFadeIn 0.3s ease;
-                        cursor: pointer;
-                    " title="Click to refresh page and apply update immediately">
-                        <div style="display: flex; align-items: center; gap: 6px; min-width: 0; color: #a7f3d0;">
-                            <span style="font-weight: 700; white-space: nowrap; font-size: 11px;">
-                                Update v${pending} Ready
-                            </span>
-                        </div>
-                        <span style="font-size: 10px; color: #a7f3d0; white-space: nowrap;">
-                            Auto-refreshing on return...
+            container.innerHTML = `
+                <div id="amaes-update-banner" style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 8px;
+                    padding: 6px 10px;
+                    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.2));
+                    border: 1px solid rgba(16, 185, 129, 0.45);
+                    border-radius: 6px;
+                    margin-bottom: 8px;
+                    font-size: 11px;
+                    animation: amaesFadeIn 0.3s ease;
+                ">
+                    <div style="display: flex; align-items: center; gap: 6px; min-width: 0; color: #a7f3d0;">
+                        ${ICONS.download}
+                        <span style="font-weight: 700; white-space: nowrap; font-size: 11px;">
+                            Update v${latestVersion} Available
                         </span>
                     </div>
-                `;
-                const bEl = document.getElementById('amaes-update-banner');
-                if (bEl) {
-                    bEl.onclick = () => {
-                        sessionStorage.setItem('amaes_update_attempted_reload', '1');
-                        window.location.reload();
-                    };
-                }
-            } else {
-                container.innerHTML = `
-                    <div id="amaes-update-banner" style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        gap: 8px;
-                        padding: 6px 10px;
-                        background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.2));
-                        border: 1px solid rgba(16, 185, 129, 0.45);
-                        border-radius: 6px;
-                        margin-bottom: 8px;
-                        font-size: 11px;
-                        animation: amaesFadeIn 0.3s ease;
-                    ">
-                        <div style="display: flex; align-items: center; gap: 6px; min-width: 0; color: #a7f3d0;">
-                            ${ICONS.download}
-                            <span style="font-weight: 700; white-space: nowrap; font-size: 11px;">
-                                Update v${latestVersion} Available
-                            </span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                            <button id="amaes-banner-update-btn" type="button" class="amaes-btn amaes-btn-primary" style="
-                                padding: 3px 11px;
-                                font-size: 11px;
-                                font-weight: 800;
-                                white-space: nowrap;
-                                border-radius: 4px;
-                                display: inline-flex;
-                                align-items: center;
-                                gap: 4px;
-                                background: linear-gradient(135deg, #10b981, #059669);
-                                color: #ffffff !important;
-                                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                                border: none;
-                                cursor: pointer;
-                                flex-shrink: 0;
-                            ">
-                                Update Now
-                            </button>
-                        </div>
+                    <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        <button id="amaes-banner-update-btn" type="button" class="amaes-btn amaes-btn-primary" style="
+                            padding: 3px 11px;
+                            font-size: 11px;
+                            font-weight: 800;
+                            white-space: nowrap;
+                            border-radius: 4px;
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 4px;
+                            background: linear-gradient(135deg, #10b981, #059669);
+                            color: #ffffff !important;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                            border: none;
+                            cursor: pointer;
+                            flex-shrink: 0;
+                        ">
+                            Update Now
+                        </button>
                     </div>
-                `;
-            }
+                </div>
+            `;
             const bUpdate = document.getElementById('amaes-banner-update-btn');
             if (bUpdate) {
                 bUpdate.onclick = () => {
                     triggerScriptUpdate(latestVersion);
-                    renderUpdateNotice(latestVersion);
                 };
             }
         } else {
@@ -580,7 +395,7 @@
         // 7. Quiz Floating HUD Update Button
         const hudUpdateIndicator = document.getElementById('hud-update-indicator');
         if (hudUpdateIndicator) {
-            hudUpdateIndicator.style.display = pending ? 'none' : 'inline-flex';
+            hudUpdateIndicator.style.display = 'inline-flex';
             hudUpdateIndicator.onclick = (e) => {
                 e.preventDefault();
                 triggerScriptUpdate(latestVersion);

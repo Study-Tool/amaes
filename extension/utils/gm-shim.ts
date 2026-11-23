@@ -118,10 +118,16 @@ export async function createGmApi(): Promise<GmApi> {
             });
             return;
           }
-          const responsePayload =
-            details.responseType === 'blob' && typeof r.responseBase64 === 'string'
-              ? decodeBase64ToBlob(r.responseBase64, r.contentType || '')
-              : (r.responseText ?? '');
+          let responsePayload: unknown = r.responseText ?? '';
+          if (details.responseType === 'blob' && typeof r.responseBase64 === 'string') {
+            responsePayload = decodeBase64ToBlob(r.responseBase64, r.contentType || '');
+          } else if (details.responseType === 'json' && typeof r.responseText === 'string') {
+            try {
+              responsePayload = JSON.parse(r.responseText);
+            } catch {
+              responsePayload = r.responseText;
+            }
+          }
           details.onload?.({
             status: r.status ?? 0,
             statusText: r.statusText ?? '',

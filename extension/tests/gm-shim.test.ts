@@ -89,7 +89,19 @@ describe('createGmApi GM shim', () => {
       });
     });
 
-    expect(sendMessage).toHaveBeenCalledTimes(2);
+    await new Promise<void>((resolve) => {
+      gm.GM_xmlhttpRequest({
+        url: 'https://amaes-community-relay.study-tool-amaes-relay.workers.dev/health',
+        responseType: 'json',
+        onload: (res) => {
+          expect(res.status).toBe(200);
+          expect(res.response).toEqual({ healthy: true });
+          resolve();
+        },
+      });
+    });
+
+    expect(sendMessage).toHaveBeenCalledTimes(3);
     vi.unstubAllGlobals();
   });
 });
