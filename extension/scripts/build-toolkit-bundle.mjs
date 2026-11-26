@@ -81,7 +81,25 @@ raw = raw
   .replace(/data && data\.tag_name/g, 'data && data.latestVersion')
   .replace(/normalizeVersion\(data\.tag_name\)/g, 'normalizeVersion(data.latestVersion)');
 
-const wrapped = `/* Auto-generated from amaes-toolkit-privacy-fix/src by scripts/build-toolkit-bundle.mjs */
+// Strip legacy inline matching functions that are now provided by the typed ./matching module.
+function stripFunctionBlock(source, signature, endMarker) {
+  const start = source.indexOf(signature);
+  if (start < 0) {
+    throw new Error(`Expected function signature not found in bundle: ${signature}`);
+  }
+  const end = source.indexOf(endMarker, start);
+  if (end < 0) {
+    throw new Error(`Expected end marker not found after ${signature}: ${endMarker}`);
+  }
+  return source.slice(0, start) + source.slice(end);
+}
+
+raw = stripFunctionBlock(raw, '    function normalizeText(str) {', '    // Normalize and structure eliminated wrong choices');
+raw = stripFunctionBlock(raw, '    function isConfirmedCandidate(item) {', '    function getStudyGuideInfo(item) {');
+
+const wrapped = `/* Auto-generated from toolkit-src by scripts/build-toolkit-bundle.mjs */
+import * as _amaesMatching from './matching';
+
 export function bootToolkit(gmApi) {
   'use strict';
   const {
@@ -92,6 +110,15 @@ export function bootToolkit(gmApi) {
     GM_notification,
     GM_xmlhttpRequest,
   } = gmApi;
+  const {
+    unscriptDigits,
+    normalizeText,
+    stripQuestionMarkup,
+    normalizeChoice,
+    normalizeQuestionMatchKey,
+    questionTextMatches,
+    isConfirmedCandidate,
+  } = _amaesMatching;
 ${raw}
 }
 `;

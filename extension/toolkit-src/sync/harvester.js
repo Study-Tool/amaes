@@ -692,6 +692,7 @@
 
         let verifiedCount = 0;
         let communityCount = 0;
+        let recentCount = 0;
         let amauoedCount = 0;
         let jennysonlineCount = 0;
 
@@ -740,12 +741,35 @@
             logDebug(`Community cache tier note for ${cleanSubCode}: ${e.message}`);
         }
 
+        // 3. Fetch near-real-time pending submissions from Cloudflare D1 relay
+        try {
+            const relayBase = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl)
+                ? communityRelayUrl
+                : COMMUNITY_RELAY_URL;
+            if (relayBase) {
+                const recentUrl = `${relayBase.replace(/\/+$/, '')}/v1/recent?subjectCode=${encodeURIComponent(cleanSubCode)}`;
+                const recentData = await fetchJsonUrl(recentUrl);
+                if (recentData && Array.isArray(recentData.questions) && recentData.questions.length > 0) {
+                    const parsedRecent = parseIncomingAnswerPayload(recentData, cleanSubCode).map(q => ({
+                        ...q,
+                        source: q.source || 'community_relay',
+                        verified: Boolean(q.verified),
+                        isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference')
+                    }));
+                    mergeAnswersIntoCache(cleanSubCode, parsedRecent, 'Cloud-Recent');
+                    recentCount = parsedRecent.length;
+                }
+            }
+        } catch (e) {
+            logDebug(`Recent relay tier note for ${cleanSubCode}: ${e.message}`);
+        }
+
         // Study-guide sources have independent local/shared freshness and remain unverified.
         const studyGuideAnswers = await refreshStudyGuideSourcesForCourse(cleanSubCode, resolvedCourseTitle);
         amauoedCount = studyGuideAnswers.filter(answer => answer.source === 'amauoed').length;
         jennysonlineCount = studyGuideAnswers.filter(answer => answer.source === 'jennysonline').length;
 
-        const cachedCount = verifiedCount + communityCount + amauoedCount;
+        const cachedCount = verifiedCount + communityCount + recentCount + amauoedCount;
         const totalAvailable = cachedCount + jennysonlineCount;
         if (totalAvailable === 0) {
             throw new Error(`No answer databases found for ${cleanSubCode}`);
@@ -757,6 +781,7 @@
             cachedCount,
             verifiedCount,
             communityCount,
+            recentCount,
             amauoedCount,
             jennysonlineCount
         };

@@ -1,4 +1,6 @@
-/* Auto-generated from amaes-toolkit-privacy-fix/src by scripts/build-toolkit-bundle.mjs */
+/* Auto-generated from toolkit-src by scripts/build-toolkit-bundle.mjs */
+import * as _amaesMatching from './matching';
+
 export function bootToolkit(gmApi) {
   'use strict';
   const {
@@ -9,6 +11,15 @@ export function bootToolkit(gmApi) {
     GM_notification,
     GM_xmlhttpRequest,
   } = gmApi;
+  const {
+    unscriptDigits,
+    normalizeText,
+    stripQuestionMarkup,
+    normalizeChoice,
+    normalizeQuestionMatchKey,
+    questionTextMatches,
+    isConfirmedCandidate,
+  } = _amaesMatching;
 
 // --- core/config.js ---
 
@@ -3103,142 +3114,6 @@ export function bootToolkit(gmApi) {
     }
 
     // String Normalization for Question & Answer Matching
-    function normalizeText(str) {
-        if (!str) return '';
-        // Unescape HTML entities
-        const doc = new DOMParser().parseFromString(str, 'text/html');
-        let text = doc.body.textContent || '';
-        text = text.toLowerCase().trim();
-        text = unscriptDigits(text);
-        // Remove question numbering like "1.", "(1)", "question 1:", "question no. 1", "question #1", "q1.", "item 1:"
-        text = text.replace(/^(?:(?:question|item|q)\s*(?:no\.?|#)?\s*\d+[\s:.-]*|\(?\d+\)?[\s:.)-]+)/i, '');
-        // Strip common question instructions / preambles:
-        // e.g. "Choose the best answer.", "Select the correct answer.", "Read the statement carefully and select the best answer."
-        const preambleRegex = /^(?:(?:direction|directions|instruction|instructions)\s*[:.\-–]\s*)?(?:read\s+(?:each\s+|the\s+)?(?:statement|question|passage)s?\s+(?:carefully\s+)?(?:and\s+)?)?(?:choose|select|pick|identify|mark)\s+(?:the\s+)?(?:best|correct|appropriate|right)\s+(?:answer|choice|option)[.:?!;\s–-]*/i;
-        while (preambleRegex.test(text)) {
-            const nextText = text.replace(preambleRegex, '').trim();
-            if (nextText.length === 0) break;
-            text = nextText;
-        }
-        // Strip trailing prompt instructions like "select one:", "choose one:", etc.
-        const trailingPromptRegex = /\b(?:select\s+one|select\s+one\s+or\s+more|choose\s+one|choose\s+one\s+or\s+more|choose\s+the\s+best\s+answer)[:.]?\s*$/i;
-        if (trailingPromptRegex.test(text)) {
-            const nextText = text.replace(trailingPromptRegex, '').trim();
-            if (nextText.length > 0) text = nextText;
-        }
-        // Strip multiple underscores down to single placeholder
-        text = text.replace(/_{2,}/g, '___');
-        // Strip extra whitespace
-        text = text.replace(/\s+/g, ' ');
-        // Strip trailing punctuation
-        text = text.replace(/[.:?!;,]+$/, '');
-        return text.trim();
-    }
-
-    function stripQuestionMarkup(text) {
-        if (!text) return '';
-        let prev;
-        let curr = String(text);
-        // Iteratively strip innermost bracket tokens first (moodle-asset, dropdown, blank, ____, image)
-        do {
-            prev = curr;
-            curr = curr.replace(/\[\s*(?:moodle-asset|dropdown|blank|image|___+)[^\[\]]*\]/gi, ' ');
-        } while (curr !== prev);
-        // Strip any remaining outer container tags (e.g. outer [Image: ...])
-        do {
-            prev = curr;
-            curr = curr.replace(/\[\s*(?:image|dropdown|blank)[^\[\]]*\]/gi, ' ');
-        } while (curr !== prev);
-        return curr;
-    }
-
-    function normalizeQuestionMatchKey(value) {
-        return normalizeText(stripQuestionMarkup(value))
-            .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
-            .replace(/[_\u00a0]+/g, ' ')
-            .trim()
-            .replace(/^[:?!;,—–-]+\s*/g, '')
-            .replace(/^(?:(?:identify\s+(?:the\s+)?(?:following|term|what\s+is\s+being\s+described)|fill\s+in\s+the\s+blanks?|complete\s+the\s+(?:statement|sentence|following)|identification|identify))\s*[:.-]*\s*/i, '')
-            .replace(/^[:?!;,—–-]+\s*/g, '')
-            .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
-            .replace(/\s+\banswer\s+question\s*(?:no\.?|#)?\s*\d+[\s:.-]*$/i, '')
-            .replace(/^(?:(?:this\s+(?:command|method|function)|jquery\s+(?:method|command|function)|it)\s+(?:is\s+)?(?:used\s+to\s+|that\s+is\s+used\s+to\s+))/i, '')
-            .replace(/\bcreates\b/gi, 'create')
-            .replace(/\s+/g, ' ')
-            .replace(/^[:?!;,—–-]+\s*/g, '')
-            .replace(/[.:?!;,—–-]+$/g, '')
-            .trim();
-    }
-
-    function questionTextMatches(left, right) {
-        const leftNorm = normalizeQuestionMatchKey(left);
-        const rightNorm = normalizeQuestionMatchKey(right);
-        if (!leftNorm || !rightNorm) return false;
-        if (leftNorm === rightNorm) return true;
-
-        const longer = leftNorm.length >= rightNorm.length ? leftNorm : rightNorm;
-        const shorter = leftNorm.length >= rightNorm.length ? rightNorm : leftNorm;
-
-        // Permit harmless prompt markup differences, but never short-token matches
-        // or collisions where extra content contains code identifiers or qualifiers.
-        if (shorter.length > 20 && longer.includes(shorter)) {
-            const idx = longer.indexOf(shorter);
-            const prefix = longer.slice(0, idx).trim();
-            const suffix = longer.slice(idx + shorter.length).trim();
-            const extra = `${prefix} ${suffix}`.trim();
-            if (/\b(?:not|never|no|false|true)\b/i.test(extra)) return false;
-            if (/^\.[a-z0-9_]+/i.test(prefix) || /\.[a-z0-9_]+\s*\(/i.test(extra)) return false;
-            return (shorter.length / longer.length) >= 0.70;
-        }
-
-        return false;
-    }
-
-    // Helper to unscript unicode superscript and subscript digits to standard digits
-    function unscriptDigits(str) {
-        if (!str) return '';
-        const map = {
-            '⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9',
-            '₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9'
-        };
-        return str.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉]/g, ch => map[ch] || ch);
-    }
-
-    function normalizeChoice(str) {
-        if (!str) return '';
-        let text = str;
-        if (typeof DOMParser !== 'undefined' && /<[a-z][\s\S]*>/i.test(str)) {
-            try {
-                const doc = new DOMParser().parseFromString(str, 'text/html');
-                const imgs = doc.body.querySelectorAll('img');
-                let extracted = doc.body.textContent || '';
-                if (!extracted.trim() && imgs.length > 0) {
-                    extracted = Array.from(imgs).map(img => {
-                        const m = (img.src || '').match(/\/pluginfile\.php\/\d+\/question\/(?:answer|questiontext|feedback)\/\d+(?:\/\d+)?\/([^?#\s]+)/i);
-                        return img.alt || (m ? `[moodle-asset:${m[1]}]` : img.src) || '';
-                    }).join(' ');
-                }
-                text = extracted || str;
-            } catch (_) {}
-        }
-        text = text.toLowerCase().trim();
-        // Moodle answer labels commonly include "a.", "b)", etc.; the
-        // stored answer value normally contains only the choice text.
-        text = text.replace(/^[a-z]\s*[\.)]\s+/i, '');
-        // Normalize Moodle pluginfile image URLs to stable image asset tokens across quiz attempts
-        text = text.replace(/https?:\/\/[^\/]+\/pluginfile\.php\/\d+\/question\/(?:answer|questiontext|feedback)\/\d+(?:\/\d+)?\/([^?#\s]+)/gi, '[moodle-asset:$1]');
-        // Normalize unicode dashes/minus signs to standard hyphen
-        text = text.replace(/[\u2212\u2013\u2014]/g, '-');
-        // Remove prefix like "select one: ", "select one or more: ", "a. ", "b) " safely without stripping negative signs
-        // Strip unicode checkmarks/crosses and trailing feedback words
-        text = text.replace(/[✓✔✗✘✕✖]/g, '');
-        text = text.replace(/\s*[\(\[]?(?:correct|incorrect)[\)\]]?\s*$/i, '');
-        text = text.replace(/\s+/g, ' ');
-        text = text.replace(/[.:?!;,]+$/, '');
-        text = unscriptDigits(text);
-        return text.trim();
-    }
-
     // Normalize and structure eliminated wrong choices with weighting & deduplication
     function normalizeWrongAnswers(rawWrong) {
         if (!rawWrong || !Array.isArray(rawWrong)) return [];
@@ -4523,23 +4398,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     function findFirstUnansweredOnCurrentPage() {
         const questions = Array.from(document.querySelectorAll('.que'));
         return questions.find(que => !isQuestionAnswered(que)) || null;
-    }
-
-    function isConfirmedCandidate(item) {
-        if (!item || item.verified !== true) return false;
-        const src = String(item.source || '').toLowerCase();
-        const evType = String(item.evidenceType || '').toLowerCase();
-        const trustedEvidence = ['moodle_review', '100_percent', 'moodle_100_percent', 'moodle_review_elimination'].includes(evType);
-        const isAiOnlySource = item.isAiSuggestion === true ||
-            evType === 'ai_inference' ||
-            /(?:gemini|(^|[^a-z])ai([^a-z]|$))/.test(src);
-
-        // AI inferences require explicit Moodle review/100% evidence before being treated as confirmed.
-        if (isAiOnlySource && !trustedEvidence) {
-            return false;
-        }
-
-        return true;
     }
 
     function getStudyGuideInfo(item) {
@@ -19509,6 +19367,7 @@ function setupAccountTransferUI() {
 
         let verifiedCount = 0;
         let communityCount = 0;
+        let recentCount = 0;
         let amauoedCount = 0;
         let jennysonlineCount = 0;
 
@@ -19557,12 +19416,35 @@ function setupAccountTransferUI() {
             logDebug(`Community cache tier note for ${cleanSubCode}: ${e.message}`);
         }
 
+        // 3. Fetch near-real-time pending submissions from Cloudflare D1 relay
+        try {
+            const relayBase = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl)
+                ? communityRelayUrl
+                : COMMUNITY_RELAY_URL;
+            if (relayBase) {
+                const recentUrl = `${relayBase.replace(/\/+$/, '')}/v1/recent?subjectCode=${encodeURIComponent(cleanSubCode)}`;
+                const recentData = await fetchJsonUrl(recentUrl);
+                if (recentData && Array.isArray(recentData.questions) && recentData.questions.length > 0) {
+                    const parsedRecent = parseIncomingAnswerPayload(recentData, cleanSubCode).map(q => ({
+                        ...q,
+                        source: q.source || 'community_relay',
+                        verified: Boolean(q.verified),
+                        isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference')
+                    }));
+                    mergeAnswersIntoCache(cleanSubCode, parsedRecent, 'Cloud-Recent');
+                    recentCount = parsedRecent.length;
+                }
+            }
+        } catch (e) {
+            logDebug(`Recent relay tier note for ${cleanSubCode}: ${e.message}`);
+        }
+
         // Study-guide sources have independent local/shared freshness and remain unverified.
         const studyGuideAnswers = await refreshStudyGuideSourcesForCourse(cleanSubCode, resolvedCourseTitle);
         amauoedCount = studyGuideAnswers.filter(answer => answer.source === 'amauoed').length;
         jennysonlineCount = studyGuideAnswers.filter(answer => answer.source === 'jennysonline').length;
 
-        const cachedCount = verifiedCount + communityCount + amauoedCount;
+        const cachedCount = verifiedCount + communityCount + recentCount + amauoedCount;
         const totalAvailable = cachedCount + jennysonlineCount;
         if (totalAvailable === 0) {
             throw new Error(`No answer databases found for ${cleanSubCode}`);
@@ -19574,6 +19456,7 @@ function setupAccountTransferUI() {
             cachedCount,
             verifiedCount,
             communityCount,
+            recentCount,
             amauoedCount,
             jennysonlineCount
         };
