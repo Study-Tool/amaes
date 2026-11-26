@@ -1473,6 +1473,15 @@
                 } catch (e) {
                     logDebug(`Auto-fetch fallback note: ${e.message}`);
                 }
+            } else if (autoCloudSync && typeof syncRecentFromRelay === 'function') {
+                try {
+                    const recentRes = await syncRecentFromRelay(subCode);
+                    if (recentRes && recentRes.count > 0) {
+                        cached = getCachedAnswers(subCode);
+                    }
+                } catch (e) {
+                    logDebug(`Recent relay refresh note: ${e.message}`);
+                }
             }
 
             const freshExternalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'

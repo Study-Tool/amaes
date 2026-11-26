@@ -59,6 +59,12 @@ describe('isConfirmedCandidate and auto-answer verification', () => {
     expect(modalsSrc).not.toContain('Acads-Tools');
     expect(contentSrc).not.toContain('#migration-step');
     expect(promptsSrc).toContain('highlightQuizAnswers(cached, Boolean(autoPickQuiz), false)');
+    expect(promptsSrc).toContain('syncRecentFromRelay(subCode)');
     expect(initSrc).toContain('highlightQuizAnswers((fresh || []).concat(jennyAnswers), Boolean(autoQuizMode || autoPickQuiz))');
+
+    const harvesterSrc = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'toolkit-src', 'sync', 'harvester.js'), 'utf8');
+    const solverSrc = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'toolkit-src', 'quiz', 'solver.js'), 'utf8');
+    expect(harvesterSrc).toContain('async function syncRecentFromRelay(');
+    expect(solverSrc).toContain('syncRecentFromRelay(subCode)');
   });
 });

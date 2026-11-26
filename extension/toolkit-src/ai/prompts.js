@@ -936,6 +936,11 @@
                         setLog(`Answers missing for <b>${subCode}</b>. Auto-fetching from AMAUOED / Cloud...`, 'var(--accent-blue)');
                         await autoFetchCloudAnswersIfMissing(subCode);
                         cached = getCachedAnswers(subCode);
+                    } else if (autoCloudSync && typeof syncRecentFromRelay === 'function') {
+                        const recentRes = await syncRecentFromRelay(subCode);
+                        if (recentRes && recentRes.count > 0) {
+                            cached = getCachedAnswers(subCode);
+                        }
                     }
                     if (cached && cached.length > 0 && (autoHighlightQuiz || autoPickQuiz)) {
                         highlightQuizAnswers(cached, Boolean(autoPickQuiz), false);

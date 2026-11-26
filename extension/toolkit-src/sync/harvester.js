@@ -787,6 +787,75 @@
         };
     }
 
+    async function syncRecentFromRelay(code, force = false) {
+        if (!code) return { count: 0 };
+        const cleanSubCode = String(code).trim().toUpperCase();
+        if (!cleanSubCode || cleanSubCode === 'DEFAULT' || cleanSubCode === 'GENERAL') {
+            return { count: 0 };
+        }
+        const throttleKey = `amaes_recent_sync_at_${cleanSubCode}`;
+        try {
+            const lastSync = Number(sessionStorage.getItem(throttleKey) || '0');
+            if (!force && Number.isFinite(lastSync) && Date.now() - lastSync < 60_000) {
+                return { count: 0, throttled: true };
+            }
+        } catch (_) {}
+
+        try {
+            const relayBase = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl)
+                ? communityRelayUrl
+                : COMMUNITY_RELAY_URL;
+            if (!relayBase) return { count: 0 };
+
+            const recentUrl = `${relayBase.replace(/\/+$/, '')}/v1/recent?subjectCode=${encodeURIComponent(cleanSubCode)}`;
+            const req = (typeof GM_xmlhttpRequest === 'function') ? GM_xmlhttpRequest :
+                        (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+            const recentData = await new Promise((resolve, reject) => {
+                if (!req) {
+                    fetch(recentUrl, { headers: { Accept: 'application/json' } })
+                        .then(res => {
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            return res.json();
+                        })
+                        .then(resolve)
+                        .catch(reject);
+                    return;
+                }
+                req({
+                    method: 'GET',
+                    url: recentUrl,
+                    headers: { Accept: 'application/json' },
+                    onload: (resp) => {
+                        if (resp.status >= 200 && resp.status < 300) {
+                            try { resolve(JSON.parse(resp.responseText)); }
+                            catch { reject(new Error('Invalid JSON')); }
+                        } else {
+                            reject(new Error(`HTTP ${resp.status}`));
+                        }
+                    },
+                    onerror: () => reject(new Error('Network error'))
+                });
+            });
+
+            try { sessionStorage.setItem(throttleKey, String(Date.now())); } catch (_) {}
+
+            if (recentData && Array.isArray(recentData.questions) && recentData.questions.length > 0) {
+                const parsedRecent = parseIncomingAnswerPayload(recentData, cleanSubCode).map(q => ({
+                    ...q,
+                    source: q.source || 'community_relay',
+                    verified: Boolean(q.verified),
+                    isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference')
+                }));
+                mergeAnswersIntoCache(cleanSubCode, parsedRecent, 'Cloud-Recent');
+                return { count: parsedRecent.length };
+            }
+        } catch (e) {
+            logDebug(`Recent relay refresh note for ${cleanSubCode}: ${e.message}`);
+        }
+        return { count: 0 };
+    }
+
     async function autoFetchCloudAnswersIfMissing(code) {
         if (!code || code === 'DEFAULT' || code === 'GENERAL') return false;
         try {
