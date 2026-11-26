@@ -4526,29 +4526,20 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     function isConfirmedCandidate(item) {
-        if (!item) return false;
+        if (!item || item.verified !== true) return false;
         const src = String(item.source || '').toLowerCase();
         const evType = String(item.evidenceType || '').toLowerCase();
-        const trustedSource = [
-            'review_screen',
-            'moodle_review',
-            'moodle_review_verified',
-            'moodle_100_percent',
-            'verified_db'
-        ].includes(src);
         const trustedEvidence = ['moodle_review', '100_percent', 'moodle_100_percent', 'moodle_review_elimination'].includes(evType);
-        const unconfirmedSource = /community|gemini|(^|[^a-z])ai([^a-z]|$)|amauoed|jennysonline/.test(src);
+        const isAiOnlySource = item.isAiSuggestion === true ||
+            evType === 'ai_inference' ||
+            /(?:gemini|(^|[^a-z])ai([^a-z]|$))/.test(src);
 
-        // Unconfirmed source labels are overridden only by explicit Moodle evidence.
-        if ((unconfirmedSource || item.isAiSuggestion) && !trustedEvidence) {
+        // AI inferences require explicit Moodle review/100% evidence before being treated as confirmed.
+        if (isAiOnlySource && !trustedEvidence) {
             return false;
         }
 
-        if (item.verified !== true) return false;
-
-        // Only exact, traceable evidence labels qualify. A low/high overall
-        // score or a generic "deduced" flag does not prove an answer.
-        return trustedSource || trustedEvidence;
+        return true;
     }
 
     function getStudyGuideInfo(item) {
@@ -10152,7 +10143,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         // EXCEPTION: When a verified/confirmed answer exists, auto-pick applies it even if a pre-checked radio exists from a prior manual attempt
                         const canSelectAnswer = (isManualSelect && hasVerifiedSource) || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
                             (hasVerifiedSource || (hasAiSource && aiAutoSelect) ||
-                                (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
+                                (isStudyGuide && autoPickStudyGuideFallback)));
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                         const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || isManualSelect);
                         if (shouldSelect) {
@@ -10164,7 +10155,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 isAdaptiveProbe: false
                             });
                         }
-                        if (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback && Boolean(autoSelect) &&
+                        if (isStudyGuide && autoPickStudyGuideFallback && Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
                             input && input.checked) {
                             que.dataset.amaesStudyGuideFallbackPicked = 'true';
                         }
@@ -10481,7 +10472,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             const canAutoFill = (isManualSelect && confirmedShortAns) ||
                                 (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
                                     (confirmedShortAns ||
-                                        (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
+                                        (isStudyGuide && autoPickStudyGuideFallback)));
                             const currentInputNorm = normalizeChoice(textInput.value || '');
                             const currentInputIsKnownWrong = currentInputNorm && allWrongList.some(w =>
                                 normalizeChoice(w.norm || w.text || w) === currentInputNorm
@@ -10491,7 +10482,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 hint.style.background = 'rgba(16, 185, 129, 0.2)';
                                 const btn = hint.querySelector('.amaes-fill-btn');
                                 if (btn) btn.innerText = 'Filled';
-                                if (!confirmedShortAns && isStudyGuide && autoQuizMode && autoPickStudyGuideFallback) {
+                                if (!confirmedShortAns && isStudyGuide && autoPickStudyGuideFallback) {
                                     que.dataset.amaesStudyGuideFallbackPicked = 'true';
                                 }
                             }
@@ -10823,7 +10814,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             const canAutoPick = (isManualSelect && ((effectiveCandidate && isConfirmedCandidate(effectiveCandidate)) || isDeducedSelect)) ||
                                 (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
                                 ((effectiveCandidate && isConfirmedCandidate(effectiveCandidate)) ||
-                                    ((hasMatchingRows ? effectiveIsStudyGuide : isStudyGuide) && autoQuizMode && autoPickStudyGuideFallback)) && !isDeducedSelect);
+                                    ((hasMatchingRows ? effectiveIsStudyGuide : isStudyGuide) && autoPickStudyGuideFallback)) && !isDeducedSelect);
                             if (canAutoPick && (!selectInput.value || selectInput.value === '0')) {
                                 selectInput.value = matchedOption.value;
                                 selectInput.dispatchEvent(new Event('input', { bubbles: true }));

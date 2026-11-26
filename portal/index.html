@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Install AMAES Toolkit for Chrome, Edge, and Firefox with a live preview, migration guide, and status check.">
+  <meta name="description" content="Install AMAES Toolkit for Chrome, Edge, and Firefox with a live preview and status check.">
   <link rel="canonical" href="https://study-tool-amaes.pages.dev/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://study-tool-amaes.pages.dev/">
@@ -23,7 +23,6 @@
   <header class="topbar">
     <a class="brand" href="./"><img src="assets/amaes-toolkit-logo.png" alt="" aria-hidden="true"><span><strong>AMAES</strong> Toolkit</span></a>
     <nav class="top-links" aria-label="Site links">
-      <a class="github-link" href="#migration-step">Upgrading?</a>
       <a class="github-link" href="#share-step">Share</a>
       <a class="github-link" href="#terms">Terms &amp; Disclaimer</a>
       <a class="github-link" href="#about">About</a>
@@ -77,7 +76,6 @@
           <div class="manager-instructions" id="install-instructions">
             <span>1</span><p>Click <strong>Download AMAES Toolkit</strong> above and extract the <code>.zip</code> into a folder you will keep.</p>
             <span>2</span><p id="browser-load-text"><strong>Chrome &amp; Brave:</strong> Click <strong>Copy Extensions URL</strong> above, paste it into your address bar (<code>Ctrl+L</code> then <code>Ctrl+V</code>), turn <strong>Developer mode</strong> ON (top right), click <strong>Load unpacked</strong>, and select the extracted folder.</p>
-            <span>3</span><p><strong>Switching from Violentmonkey?</strong> Disable the old userscript so AMAES Toolkit does not run twice—your settings move over automatically.</p>
           </div>
         </article>
 
@@ -113,16 +111,6 @@
               <span class="version-result" id="version-result" aria-live="polite"></span>
             </div>
             <p>Latest version: <strong class="release-badge" id="release-version">checking...</strong> · Service: <strong id="relay-health-badge">checking...</strong></p>
-          </div>
-        </article>
-
-        <article class="action-card" id="migration-step">
-          <div class="card-kicker">UPGRADING FROM VIOLENTMONKEY</div>
-          <h2>Move your data seamlessly</h2>
-          <div class="manager-instructions" style="margin-top: 8px;">
-            <span>1</span><p><strong>Settings &amp; Gemini API keys:</strong> Copied automatically into AMAES Toolkit on your first visit to Moodle.</p>
-            <span>2</span><p><strong>Saved Account Switcher logins:</strong> Before turning off the old script, open <strong>Setup Transfer</strong> in the old panel and create a one-time transfer code, then import that code in the new extension.</p>
-            <span>3</span><p><strong>Turn off the old script:</strong> Disable <code>amaes-toolkit.user.js</code> inside Violentmonkey and refresh Moodle.</p>
           </div>
         </article>
 
@@ -169,11 +157,11 @@
         </div>
         <div class="terms-item">
           <h3>"As Is" Warranty &amp; Liability</h3>
-          <p>Provided without warranties of any kind. Authors and contributors are not responsible for academic outcomes, disciplinary actions, lost data, or service interruptions arising from use or misuse.</p>
+          <p>Provided "as is" without warranties of any kind. The developer and contributors are not responsible for academic outcomes, disciplinary actions, account actions, lost data, service interruptions, legal claims, or other losses arising from use or misuse.</p>
         </div>
       </div>
       <div class="terms-footer-action">
-        <a class="button secondary" id="terms-link" href="https://github.com/Study-Tool/database/blob/main/TERMS.md" target="_blank" rel="noreferrer">Read Full Legal Terms (TERMS.md)</a>
+        <a class="button secondary" id="terms-link" href="https://github.com/Study-Tool/amaes/blob/main/docs/TERMS.md" target="_blank" rel="noreferrer">Read Full Legal Terms (TERMS.md)</a>
       </div>
     </section>
 
@@ -217,7 +205,7 @@
 
   <footer>
     <span>Privacy-first extension · no personal tracking</span>
-    <span class="footer-links">· <a href="#migration-step">Migration</a> · <a href="#share-step">Share</a> · <a href="#terms">Terms</a> · <a href="#about">About</a> · <a href="dashboard.html">Dashboard</a> · <a id="footer-db-link" href="https://github.com/Study-Tool/database" target="_blank" rel="noreferrer">Database Repo</a> · <a id="footer-repo-link" href="https://github.com/Study-Tool/amaes" target="_blank" rel="noreferrer">Source Repo</a> · <a id="footer-support-link" href="https://github.com/Study-Tool/amaes/issues" target="_blank" rel="noreferrer">Support</a></span>
+    <span class="footer-links">· <a href="#share-step">Share</a> · <a href="#terms">Terms</a> · <a href="#about">About</a> · <a href="dashboard.html">Dashboard</a> · <a id="footer-db-link" href="https://github.com/Study-Tool/database" target="_blank" rel="noreferrer">Database Repo</a> · <a id="footer-repo-link" href="https://github.com/Study-Tool/amaes" target="_blank" rel="noreferrer">Source Repo</a> · <a id="footer-support-link" href="https://github.com/Study-Tool/amaes/issues" target="_blank" rel="noreferrer">Support</a></span>
   </footer>
 
   <div class="qr-modal-backdrop" id="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title" hidden>
