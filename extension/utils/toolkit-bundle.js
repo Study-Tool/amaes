@@ -23,7 +23,7 @@ export function bootToolkit(gmApi) {
 
 // --- core/config.js ---
 
-    const SCRIPT_VERSION = "v0.1.3";
+    const SCRIPT_VERSION = "v0.1.4";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.study-tool-amaes-relay.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;

@@ -29,7 +29,7 @@ export const CONFIG_TTL_MS = 6 * 60 * 60 * 1000;
 
 export const DEFAULT_REMOTE_CONFIG: RemoteConfig = {
   minVersion: '0.1.0',
-  latestVersion: '0.1.3',
+  latestVersion: '0.1.4',
   links: {
     homepage: 'https://study-tool-amaes.pages.dev/',
     support: 'https://github.com/Study-Tool/amaes/issues',
