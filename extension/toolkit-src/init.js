@@ -166,25 +166,9 @@
                             const fresh = getCachedAnswers(sc);
                             const lbl = document.getElementById('fetch-btn-label');
                             if (lbl && fresh) lbl.innerText = `Refresh Answers (${fresh.length} cached)`;
-                            if (checkIsQuizPage()) {
+                            if (checkIsQuizPage() && (autoHighlightQuiz || autoPickQuiz || autoQuizMode)) {
                                 const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(sc) : [];
-                                highlightQuizAnswers((fresh || []).concat(jennyAnswers), false);
-                            }
-                        } else if (autoScrapeAmauoed) {
-                            const link = await autoFindAmauoedLink(sc, cInfo.subjectName || '');
-                            if (link) {
-                                const scraped = await loadAllAmauoedAnswers(link);
-                                if (scraped && scraped.length > 0) {
-                                    mergeAnswersIntoCache(sc, scraped, 'AMAUOED');
-                                    showToast(`Auto-scraped ${scraped.length} answers from AMAUOED for ${sc}!`);
-                                    setLog(`Auto-scraped <b>${scraped.length}</b> answers for <b>${sc}</b> from AMAUOED.`, "var(--accent-green)");
-                                    const fresh = getCachedAnswers(sc);
-                                    const lbl = document.getElementById('fetch-btn-label');
-                                    if (lbl && fresh) lbl.innerText = `Refresh Answers (${fresh.length} cached)`;
-                                    if (checkIsQuizPage()) {
-                                        highlightQuizAnswers(fresh, false);
-                                    }
-                                }
+                                highlightQuizAnswers((fresh || []).concat(jennyAnswers), Boolean(autoQuizMode || autoPickQuiz));
                             }
                         }
                     }).catch(async (err) => {

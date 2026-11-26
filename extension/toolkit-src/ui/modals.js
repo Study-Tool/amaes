@@ -40,43 +40,39 @@
                 
                 <div id="amaes-welcome-scroll-container" style="padding: 20px 24px; font-size: 12px; line-height: 1.5; display: flex; flex-direction: column; gap: 18px; overflow-y: auto;">
                     
-                    <!-- Core Highlights Feature List (Clean & Unboxed) -->
-                    <div id="amaes-welcome-highlight-card" style="display: flex; flex-direction: column; gap: 14px;">
-                        <!-- Auto-Answer -->
+                    <!-- 3 Easy Steps Onboarding -->
+                    <div id="amaes-welcome-highlight-card" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: ${isLight ? '#059669' : '#34d399'};">Get Started in 3 Easy Steps</div>
+
+                        <!-- Step 1 -->
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <span style="color: ${isLight ? '#059669' : '#10b981'}; margin-top: 2px; flex-shrink: 0;">${ICONS.checkCircle}</span>
+                            <span style="width: 22px; height: 22px; border-radius: 50%; background: ${isLight ? 'rgba(16, 185, 129, 0.14)' : 'rgba(16, 185, 129, 0.22)'}; color: ${isLight ? '#059669' : '#34d399'}; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;">1</span>
                             <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Smart Auto-Answer & Highlighter</div>
-                                    <span style="font-size: 9px; color: ${isLight ? '#047857' : '#34d399'}; font-weight: 600; background: ${isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.18)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.3)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">Background Capable</span>
-                                </div>
-                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.</div>
+                                <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Open Any Quiz</div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Verified answers auto-highlight and auto-pick for you. Click <b>Start Auto-Quiz</b> (or press <b>P</b>) for hands-free mode.</div>
                             </div>
                         </div>
 
-                        <!-- Community Sharing -->
+                        <!-- Step 2 -->
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <span style="color: ${isLight ? '#2563eb' : '#60a5fa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.upload}</span>
+                            <span style="width: 22px; height: 22px; border-radius: 50%; background: ${isLight ? 'rgba(124, 58, 237, 0.12)' : 'rgba(168, 85, 247, 0.22)'}; color: ${isLight ? '#7c3aed' : '#c084fc'}; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;">2</span>
                             <div style="flex: 1;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Collect & Share Anonymously</div>
-                                    <span style="font-size: 9px; color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; background: ${isLight ? 'rgba(37, 99, 235, 0.12)' : 'rgba(59, 130, 246, 0.20)'}; border: 1px solid ${isLight ? 'rgba(37, 99, 235, 0.25)' : 'rgba(96, 165, 250, 0.30)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">100% Anonymous</span>
-                                </div>
-                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Completed quiz answers are shared anonymously with classmates with zero personal data collected.</div>
-                            </div>
-                        </div>
-
-                        <!-- Built-in Gemini AI -->
-                        <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <span style="color: ${isLight ? '#7c3aed' : '#a855f7'}; margin-top: 2px; flex-shrink: 0;">${ICONS.zap}</span>
-                            <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Built-in Google Gemini AI</div>
+                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">(Optional) Setup Free AI</div>
                                     <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: ${isLight ? 'rgba(124, 58, 237, 0.08)' : 'rgba(168, 85, 247, 0.14)'}; color: ${isLight ? '#7c3aed' : '#c084fc'}; border: 1px solid ${isLight ? 'rgba(124, 58, 237, 0.25)' : 'rgba(168, 85, 247, 0.3)'}; font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;">
                                         ${geminiApiKey ? 'Key Configured' : 'Setup AI'}
                                     </button>
                                 </div>
-                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Instant in-quiz AI solver for questions not yet in the community database.</div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Add a free Google Gemini key to solve new questions not yet in the database.</div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <span style="width: 22px; height: 22px; border-radius: 50%; background: ${isLight ? 'rgba(37, 99, 235, 0.12)' : 'rgba(59, 130, 246, 0.22)'}; color: ${isLight ? '#2563eb' : '#60a5fa'}; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;">3</span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Review Completed Quizzes</div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Verified answers are shared anonymously (zero personal data) so everyone benefits next time.</div>
                             </div>
                         </div>
                     </div>
@@ -252,14 +248,14 @@
                     <!-- Agreement Disclaimer (Unboxed & Clean) -->
                     <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
                         <input id="welcome-chk-terms" type="checkbox" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0; accent-color: #10b981;" />
-                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid provided "AS IS". I agree to the <a id="welcome-terms-link" href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/docs/TERMS.md" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;">Terms of Use &amp; Disclaimer</a>, acknowledge that I am solely responsible for my own coursework and academic integrity, and agree to share verified answers anonymously to help classmates.</span>
+                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid provided "AS IS". I agree to the <a id="welcome-terms-link" href="https://github.com/Study-Tool/amaes/blob/main/docs/TERMS.md" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;">Terms of Use &amp; Disclaimer</a>, acknowledge that I am solely responsible for my own coursework and academic integrity, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
 
                 <!-- Footer Action -->
                 <div style="padding: 14px 24px; border-top: 1px solid ${isLight ? '#f4f4f5' : '#27272a'}; background: ${isLight ? '#ffffff' : '#18181b'}; display: flex; justify-content: space-between; align-items: center;">
-                    <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
-                        ${ICONS.book} <span>FAQs & Guide</span>
+                    <a href="https://study-tool-amaes.pages.dev/#about" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View How It Works &amp; Guide">
+                        ${ICONS.book} <span>How It Works</span>
                     </a>
                     <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
                         ${ICONS.zap} ${wasAlreadyAcknowledged ? 'Done' : 'Get Started'}

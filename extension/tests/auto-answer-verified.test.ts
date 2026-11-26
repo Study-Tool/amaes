@@ -47,4 +47,18 @@ describe('isConfirmedCandidate and auto-answer verification', () => {
     expect(solverSrc).not.toContain('isStudyGuide && autoQuizMode && autoPickStudyGuideFallback');
     expect(solverSrc).toContain('isStudyGuide && autoPickStudyGuideFallback');
   });
+
+  it('uses 3 Easy Steps in welcome modal with valid links and respects autoPickQuiz on load', () => {
+    const modalsSrc = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'toolkit-src', 'ui', 'modals.js'), 'utf8');
+    const contentSrc = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'entrypoints', 'content.ts'), 'utf8');
+    const promptsSrc = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'toolkit-src', 'ai', 'prompts.js'), 'utf8');
+    const initSrc = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'toolkit-src', 'init.js'), 'utf8');
+
+    expect(modalsSrc).toContain('Get Started in 3 Easy Steps');
+    expect(modalsSrc).not.toContain('frequently-asked-questions-faqs');
+    expect(modalsSrc).not.toContain('Acads-Tools');
+    expect(contentSrc).not.toContain('#migration-step');
+    expect(promptsSrc).toContain('highlightQuizAnswers(cached, Boolean(autoPickQuiz), false)');
+    expect(initSrc).toContain('highlightQuizAnswers((fresh || []).concat(jennyAnswers), Boolean(autoQuizMode || autoPickQuiz))');
+  });
 });

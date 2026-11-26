@@ -937,8 +937,8 @@
                         await autoFetchCloudAnswersIfMissing(subCode);
                         cached = getCachedAnswers(subCode);
                     }
-                    if (cached && cached.length > 0) {
-                        highlightQuizAnswers(cached, false, false);
+                    if (cached && cached.length > 0 && (autoHighlightQuiz || autoPickQuiz)) {
+                        highlightQuizAnswers(cached, Boolean(autoPickQuiz), false);
                     }
                 }
                 triggerAutoCopyForAI();
@@ -950,8 +950,16 @@
             handleQuizSummaryAutoSubmit();
         }
 
-        // Debounced observer: updates buttons, answer listeners, and review harvesting
-        const observer = new MutationObserver(() => {
+        // Debounced observer: ignore our own .amaes-* DOM injections to avoid redundant re-scans
+        const observer = new MutationObserver((mutations) => {
+            const hasRelevantMutation = mutations.some(m =>
+                Array.from(m.addedNodes).some(node =>
+                    node.nodeType === 1 &&
+                    !String(node.className || '').includes('amaes-') &&
+                    !String(node.id || '').startsWith('amaes-')
+                )
+            );
+            if (!hasRelevantMutation) return;
             clearTimeout(observerDebounceTimer);
             observerDebounceTimer = setTimeout(() => {
                 injectQuestionCopyButtons();

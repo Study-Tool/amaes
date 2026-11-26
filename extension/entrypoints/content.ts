@@ -28,27 +28,19 @@ function renderInlineMigrationNotice(version: string) {
   textWrap.style.flex = '1 1 280px';
 
   const title = document.createElement('strong');
-  title.textContent = `AMAES Toolkit Extension v${version} is installed alongside the old script.`;
+  title.textContent = `AMAES Toolkit Extension v${version} is active alongside an older userscript.`;
   title.style.display = 'block';
   title.style.color = '#93c5fd';
 
   const body = document.createElement('span');
   body.textContent =
-    'Your settings and API keys have been imported automatically. If you use Account Switcher profiles, create a Setup Transfer code in the old panel first, then turn off the old Violentmonkey script and refresh this page.';
+    'Your settings and API keys have been imported automatically. Please disable the old userscript in your script manager and refresh this page to avoid duplicate panels.';
 
   textWrap.appendChild(title);
   textWrap.appendChild(body);
 
   const actions = document.createElement('div');
   actions.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0;';
-
-  const guideLink = document.createElement('a');
-  guideLink.href = 'https://study-tool-amaes.pages.dev/#migration-step';
-  guideLink.target = '_blank';
-  guideLink.rel = 'noopener noreferrer';
-  guideLink.textContent = 'Migration Guide';
-  guideLink.style.cssText =
-    'padding:6px 10px;border-radius:6px;background:#2563eb;color:#fff;text-decoration:none;font-size:12px;font-weight:600;';
 
   const dismissBtn = document.createElement('button');
   dismissBtn.type = 'button';
@@ -57,7 +49,6 @@ function renderInlineMigrationNotice(version: string) {
     'padding:6px 10px;border-radius:6px;background:#1e293b;color:#cbd5e1;border:1px solid #334155;font-size:12px;cursor:pointer;';
   dismissBtn.addEventListener('click', () => box.remove());
 
-  actions.appendChild(guideLink);
   actions.appendChild(dismissBtn);
   box.appendChild(textWrap);
   box.appendChild(actions);
